@@ -1,0 +1,499 @@
+# ---------------------------------------------------------------------------
+# Scenario definitions (Section 16).
+#
+# A scenario is a deterministic script: a seed, a duration, and a timeline of
+# fault injections applied to the simulated sensor streams. Given the same
+# seed and the same timeline the ground truth and every sensor sample are
+# reproduced bit for bit, which is what makes the replay tests meaningful.
+#
+# Fault types are implemented in src/simulation/faults.js. Adding a type there
+# and referencing it here is the only way to extend the fault catalogue - there
+# is no scripting hook, by design (Section 22).
+# ---------------------------------------------------------------------------
+
+scenarios:
+  - id: SCN_01_HEALTHY
+    name: Healthy Navigation
+    order: 1
+    category: BASELINE
+    duration_s: 600
+    seed: 1001
+    ins_enabled: true
+    local_ranging_enabled: false
+    summary: >-
+      All sensors nominal through the full route. Demonstrates that healthy GNSS
+      is accepted, that the fused solution agrees with ground truth, and that the
+      2 m requirement is reported as met without exaggeration.
+    expected_outcome: Requirement met for effectively the whole run.
+    faults: []
+
+  - id: SCN_02_GNSS_JUMP
+    name: GNSS Sudden Jump
+    order: 2
+    category: SPOOFING
+    duration_s: 600
+    seed: 1002
+    ins_enabled: true
+    local_ranging_enabled: false
+    summary: >-
+      At t=180 s the GNSS position jumps 50 m east while every other sensor
+      continues to indicate the true track. The jump must be detected within a
+      small number of epochs and GNSS excluded.
+    expected_outcome: Spoofing detected and GNSS excluded within 2 s of the jump.
+    faults:
+      - id: F_JUMP
+        label: GNSS 50 m east jump
+        sensor_id: GNSS_01
+        type: GNSS_POSITION_JUMP
+        start_s: 180
+        end_s: 480
+        params: { east_m: 50.0, north_m: 0.0 }
+
+  - id: SCN_03_GRADUAL_DRAG
+    name: Gradual Spoofing Drag
+    order: 3
+    category: SPOOFING
+    duration_s: 720
+    seed: 1003
+    ins_enabled: true
+    local_ranging_enabled: false
+    summary: >-
+      From t=150 s the GNSS position is dragged 1 m every 10 s on a bearing of
+      120 degrees until it reaches a 40 m offset. This is the hardest spoofing
+      case because each individual epoch looks plausible.
+    expected_outcome: Drag detected before the offset reaches 20 m.
+    faults:
+      - id: F_DRAG
+        label: Gradual 0.1 m/s drag on 120 degrees
+        sensor_id: GNSS_01
+        type: GNSS_GRADUAL_DRAG
+        start_s: 150
+        end_s: 700
+        params: { rate_m_per_s: 0.1, bearing_deg: 120.0, max_offset_m: 40.0 }
+
+  - id: SCN_04_JAMMING
+    name: GNSS Jamming
+    order: 4
+    category: JAMMING
+    duration_s: 660
+    seed: 1004
+    ins_enabled: true
+    local_ranging_enabled: false
+    summary: >-
+      Interference ramps up from t=200 s: C/N0 collapses, satellites drop out,
+      HDOP rises, and by t=260 s no fix is available at all. Navigation must
+      continue on radar, gyro and DVL.
+    expected_outcome: Jamming detected, GNSS rejected, navigation continues.
+    faults:
+      - id: F_JAM_RAMP
+        label: Interference ramp
+        sensor_id: GNSS_01
+        type: GNSS_JAMMING
+        start_s: 200
+        end_s: 500
+        params: { ramp_s: 60, max_severity: 1.0 }
+      - id: F_JAM_OUTAGE
+        label: Complete loss of fix
+        sensor_id: GNSS_01
+        type: GNSS_OUTAGE
+        start_s: 265
+        end_s: 500
+        params: {}
+
+  - id: SCN_05_FLAT_SEABED
+    name: Flat Seabed Ambiguity
+    order: 5
+    category: LOCALIZATION
+    duration_s: 600
+    seed: 1005
+    ins_enabled: true
+    local_ranging_enabled: false
+    summary: >-
+      GNSS is lost at t=120 s and the vessel transits a dredged, featureless
+      basin. The bathymetric matcher finds multiple equally good candidates and
+      must report ambiguity rather than a confident wrong answer.
+    expected_outcome: Bathymetric confidence collapses, ambiguity is reported, the fix is down-weighted.
+    faults:
+      - id: F_OUTAGE
+        label: GNSS outage
+        sensor_id: GNSS_01
+        type: GNSS_OUTAGE
+        start_s: 120
+        end_s: 600
+        params: {}
+      - id: F_FLAT
+        label: Featureless seabed
+        sensor_id: BATHY_01
+        type: BATHY_FLAT_SEABED
+        start_s: 150
+        end_s: 480
+        params: { observability: 0.05 }
+
+  - id: SCN_06_RADAR_LOSS
+    name: Radar Feature Loss
+    order: 6
+    category: LOCALIZATION
+    duration_s: 600
+    seed: 1006
+    ins_enabled: true
+    local_ranging_enabled: false
+    summary: >-
+      GNSS is rejected and the vessel moves into open water where too few mapped
+      radar features remain in view. Radar match confidence falls, uncertainty
+      grows and the 2 m requirement moves to at-risk and then not met.
+    expected_outcome: Uncertainty grows, requirement transitions MET -> AT_RISK -> NOT_MET.
+    faults:
+      - id: F_OUTAGE
+        label: GNSS outage
+        sensor_id: GNSS_01
+        type: GNSS_OUTAGE
+        start_s: 100
+        end_s: 600
+        params: {}
+      - id: F_RADAR
+        label: Radar feature loss
+        sensor_id: RADAR_01
+        type: RADAR_CONFIDENCE_LOSS
+        start_s: 200
+        end_s: 460
+        params: { confidence_scale: 0.05, sigma_multiplier: 8.0 }
+
+  - id: SCN_07_DVL_BOTTOM_LOCK
+    name: DVL Bottom-Lock Loss
+    order: 7
+    category: SENSOR_FAILURE
+    duration_s: 540
+    seed: 1007
+    ins_enabled: true
+    local_ranging_enabled: false
+    summary: >-
+      The DVL loses bottom lock over deep water while GNSS is unavailable. The
+      solution falls back on the less accurate speed log and the uncertainty
+      growth rate visibly increases.
+    expected_outcome: DVL invalidated, alarm raised, protection level growth accelerates.
+    faults:
+      - id: F_OUTAGE
+        label: GNSS outage
+        sensor_id: GNSS_01
+        type: GNSS_OUTAGE
+        start_s: 90
+        end_s: 540
+        params: {}
+      - id: F_DVL
+        label: Bottom-lock loss
+        sensor_id: DVL_01
+        type: DVL_BOTTOM_LOCK_LOSS
+        start_s: 180
+        end_s: 420
+        params: {}
+
+  - id: SCN_08_GYRO_BIAS
+    name: Gyro Heading Bias
+    order: 8
+    category: SENSOR_FAILURE
+    duration_s: 600
+    seed: 1008
+    ins_enabled: true
+    local_ranging_enabled: false
+    summary: >-
+      A heading bias ramps in at 0.02 deg/s to a final 6 degrees. The filter's
+      gyro-bias state should absorb part of it while the residual monitor flags
+      the disagreement with the radar-derived heading.
+    expected_outcome: Heading bias estimated, residual alarm raised, position error bounded by radar.
+    faults:
+      - id: F_GYRO
+        label: Ramping heading bias
+        sensor_id: GYRO_01
+        type: GYRO_BIAS
+        start_s: 120
+        end_s: 600
+        params: { rate_deg_per_s: 0.02, max_bias_deg: 6.0 }
+
+  - id: SCN_09_GNSS_RECOVERY
+    name: GNSS Recovery Validation
+    order: 9
+    category: RECOVERY
+    duration_s: 720
+    seed: 1009
+    ins_enabled: true
+    local_ranging_enabled: false
+    summary: >-
+      GNSS is spoofed, rejected, then returns clean at t=420 s. It must be held
+      out of the solution for the full 30 s validation window and only then
+      gradually reintegrated.
+    expected_outcome: GNSS held for 30 s, then reintegrated with a logged event.
+    faults:
+      - id: F_JUMP
+        label: Spoofing jump
+        sensor_id: GNSS_01
+        type: GNSS_POSITION_JUMP
+        start_s: 150
+        end_s: 300
+        params: { east_m: -35.0, north_m: 20.0 }
+      - id: F_OUTAGE
+        label: Attacker withdraws, signal lost
+        sensor_id: GNSS_01
+        type: GNSS_OUTAGE
+        start_s: 300
+        end_s: 420
+        params: {}
+
+  - id: SCN_10_MULTIPLE_FAILURE
+    name: Multiple Sensor Failure
+    order: 10
+    category: DEGRADED
+    duration_s: 720
+    seed: 1010
+    ins_enabled: true
+    local_ranging_enabled: false
+    summary: >-
+      GNSS is rejected, radar becomes unavailable and the DVL degrades. The
+      system must state plainly that the 2 m requirement can no longer be
+      assured rather than continuing to publish a confident position.
+    expected_outcome: INTEGRITY_NOT_ASSURED declared, requirement reported NOT_MET.
+    faults:
+      - id: F_DRAG
+        label: Spoofing drag
+        sensor_id: GNSS_01
+        type: GNSS_GRADUAL_DRAG
+        start_s: 120
+        end_s: 300
+        params: { rate_m_per_s: 0.25, bearing_deg: 45.0, max_offset_m: 60.0 }
+      - id: F_OUTAGE
+        label: GNSS lost
+        sensor_id: GNSS_01
+        type: GNSS_OUTAGE
+        start_s: 300
+        end_s: 720
+        params: {}
+      - id: F_RADAR
+        label: Radar unavailable
+        sensor_id: RADAR_01
+        type: RADAR_UNAVAILABLE
+        start_s: 330
+        end_s: 660
+        params: {}
+      - id: F_LIDAR
+        label: LiDAR unavailable
+        sensor_id: LIDAR_01
+        type: LIDAR_UNAVAILABLE
+        start_s: 330
+        end_s: 660
+        params: {}
+      - id: F_BATHY
+        label: Featureless seabed
+        sensor_id: BATHY_01
+        type: BATHY_FLAT_SEABED
+        start_s: 340
+        end_s: 660
+        params: { observability: 0.06 }
+      - id: F_DVL
+        label: DVL degraded
+        sensor_id: DVL_01
+        type: SENSOR_NOISE
+        start_s: 360
+        end_s: 660
+        params: { multiplier: 14.0 }
+
+  - id: SCN_11_MESSAGE_INTEGRITY
+    name: Message Integrity Faults
+    order: 11
+    category: SENSOR_FAILURE
+    duration_s: 480
+    seed: 1011
+    ins_enabled: true
+    local_ranging_enabled: false
+    summary: >-
+      Delayed, duplicated and out-of-order messages, a frozen DVL velocity, a
+      speed-log scale error and an echo-sounder depth offset are injected
+      together to exercise the ingestion validation and fault catalogue.
+    expected_outcome: Every message defect is detected and categorised; navigation is unaffected.
+    faults:
+      - id: F_LATENCY
+        label: Radar message latency
+        sensor_id: RADAR_01
+        type: SENSOR_LATENCY
+        start_s: 60
+        end_s: 300
+        params: { extra_latency_ms: 2600 }
+      - id: F_DUP
+        label: Duplicate gyro messages
+        sensor_id: GYRO_01
+        type: SENSOR_DUPLICATE
+        start_s: 90
+        end_s: 300
+        params: { probability: 0.25 }
+      - id: F_OOO
+        label: Out-of-order DVL messages
+        sensor_id: DVL_01
+        type: SENSOR_OUT_OF_ORDER
+        start_s: 120
+        end_s: 300
+        params: { probability: 0.2, max_shift_s: 1.5 }
+      - id: F_FREEZE
+        label: Frozen DVL velocity
+        sensor_id: DVL_01
+        type: SENSOR_FREEZE
+        start_s: 200
+        end_s: 320
+        params: {}
+      - id: F_SCALE
+        label: Speed log scale error
+        sensor_id: SPEEDLOG_01
+        type: SPEEDLOG_SCALE_ERROR
+        start_s: 150
+        end_s: 480
+        params: { scale: 1.18 }
+      - id: F_DEPTH
+        label: Echo sounder depth offset
+        sensor_id: ECHO_01
+        type: ECHO_DEPTH_OFFSET
+        start_s: 180
+        end_s: 480
+        params: { offset_m: 1.4 }
+
+  - id: SCN_12_FALSE_TIME
+    name: GNSS False Time and Frozen Position
+    order: 12
+    category: SPOOFING
+    duration_s: 480
+    seed: 1012
+    ins_enabled: true
+    local_ranging_enabled: false
+    summary: >-
+      Two further spoofing signatures: a 4 s GNSS time offset, then a frozen
+      GNSS position while the vessel continues to move, plus a falsified course
+      over ground.
+    expected_outcome: Time jump and frozen coordinates both detected and logged.
+    faults:
+      - id: F_TIME
+        label: GNSS time offset
+        sensor_id: GNSS_01
+        type: GNSS_FALSE_TIME
+        start_s: 120
+        end_s: 220
+        params: { offset_s: 4.0 }
+      - id: F_FROZEN
+        label: Frozen GNSS position
+        sensor_id: GNSS_01
+        type: GNSS_FREEZE
+        start_s: 240
+        end_s: 360
+        params: {}
+      - id: F_COURSE
+        label: False course over ground
+        sensor_id: GNSS_01
+        type: GNSS_FALSE_COURSE
+        start_s: 380
+        end_s: 470
+        params: { course_offset_deg: 55.0 }
+
+  - id: SCN_13_INS_DISABLED
+    name: GNSS-Denied Without INS
+    order: 13
+    category: DEGRADED
+    duration_s: 600
+    seed: 1013
+    ins_enabled: false
+    local_ranging_enabled: false
+    summary: >-
+      The same GNSS outage as scenario 4 but with no INS fitted, proving the
+      platform operates without inertial aiding as required by Section 10.5.
+    expected_outcome: Navigation continues on radar, gyro and DVL with no INS messages present.
+    faults:
+      - id: F_OUTAGE
+        label: GNSS outage
+        sensor_id: GNSS_01
+        type: GNSS_OUTAGE
+        start_s: 120
+        end_s: 600
+        params: {}
+
+  - id: SCN_14_LOCAL_POSITIONING
+    name: Local Positioning Infrastructure
+    order: 14
+    category: LOCALIZATION
+    duration_s: 600
+    seed: 1014
+    ins_enabled: true
+    local_ranging_enabled: true
+    summary: >-
+      GNSS is unavailable inside a quay area covered by a simulated terrestrial
+      ranging network, demonstrating the local positioning engine and the
+      LOCAL_POSITIONING_MODE state.
+    expected_outcome: Requirement remains met on local ranging alone inside coverage.
+    faults:
+      - id: F_OUTAGE
+        label: GNSS outage
+        sensor_id: GNSS_01
+        type: GNSS_OUTAGE
+        start_s: 60
+        end_s: 600
+        params: {}
+
+  - id: SCN_15_SAFEEN_DEMO
+    name: Safeen GNSS-Denied Survey Demonstration
+    order: 15
+    category: DEMONSTRATION
+    duration_s: 900
+    seed: 2024
+    ins_enabled: true
+    local_ranging_enabled: false
+    is_demonstration: true
+    summary: >-
+      The guided end-to-end demonstration required by Section 30. Healthy start,
+      gradual spoofing, detection and exclusion, continued navigation on radar
+      and bathymetry, a feature-poor zone where the requirement can no longer be
+      assured, restoration of radar features, then GNSS recovery with a 30 s
+      validation window.
+    expected_outcome: Every stage of the Section 30 demonstration script is exercised.
+    demo_steps:
+      - { at_s: 0, title: Healthy start, detail: GNSS agrees with radar and DVL; the 2 m requirement is met. }
+      - { at_s: 120, title: Spoofing begins, detail: GNSS is gradually dragged away from the true track. }
+      - { at_s: 150, title: Residuals rise, detail: Watch the GNSS integrity panel - innovation against radar grows. }
+      - { at_s: 180, title: Trust collapses, detail: The GNSS trust score falls through the degraded and suspect bands. }
+      - { at_s: 200, title: Spoofing alarm, detail: A CRITICAL alarm is raised and GNSS is excluded from fusion. }
+      - { at_s: 240, title: Independent navigation, detail: Position is maintained by radar, bathymetry, gyro and DVL. }
+      - { at_s: 420, title: Feature-poor zone, detail: Radar confidence drops and the seabed becomes featureless. }
+      - { at_s: 470, title: Uncertainty grows, detail: The protection level rises; requirement moves to AT RISK. }
+      - { at_s: 540, title: Integrity not assured, detail: Protection level exceeds 2 m; the system says so plainly. }
+      - { at_s: 640, title: Radar restored, detail: Mapped features return and an absolute correction is applied. }
+      - { at_s: 720, title: GNSS returns, detail: Clean GNSS reappears and enters the 30 s validation window. }
+      - { at_s: 755, title: Reintegration, detail: GNSS is gradually restored to the solution and the event is logged. }
+      - { at_s: 860, title: Report, detail: Export the performance report comparing the fused solution against ground truth. }
+    faults:
+      - id: F_DRAG
+        label: Gradual GNSS spoofing drag
+        sensor_id: GNSS_01
+        type: GNSS_GRADUAL_DRAG
+        start_s: 120
+        end_s: 400
+        params: { rate_m_per_s: 0.12, bearing_deg: 100.0, max_offset_m: 45.0 }
+      - id: F_OUTAGE
+        label: Attacker withdraws
+        sensor_id: GNSS_01
+        type: GNSS_OUTAGE
+        start_s: 400
+        end_s: 720
+        params: {}
+      - id: F_RADAR
+        label: Feature-poor zone
+        sensor_id: RADAR_01
+        type: RADAR_CONFIDENCE_LOSS
+        start_s: 420
+        end_s: 640
+        params: { confidence_scale: 0.06, sigma_multiplier: 9.0 }
+      - id: F_BATHY
+        label: Featureless seabed
+        sensor_id: BATHY_01
+        type: BATHY_FLAT_SEABED
+        start_s: 430
+        end_s: 640
+        params: { observability: 0.05 }
+      - id: F_LIDAR
+        label: No structures within LiDAR range
+        sensor_id: LIDAR_01
+        type: LIDAR_UNAVAILABLE
+        start_s: 420
+        end_s: 640
+        params: {}

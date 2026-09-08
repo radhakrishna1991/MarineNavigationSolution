@@ -1,0 +1,372 @@
+﻿# ---------------------------------------------------------------------------
+# iSpatialTec Assured Marine Navigation Platform - runtime configuration
+#
+# Every threshold used by the integrity, trust, fusion and fault-detection
+# engines lives here. Nothing in this file is hard-coded in the engines.
+# Values may be overridden at runtime through PUT /api/config (engineer role),
+# which persists an override row in the database and writes an audit record.
+# ---------------------------------------------------------------------------
+
+platform:
+  name: iSpatialTec Assured Marine Navigation Platform
+  short_name: AMNP
+  version: 1.0.0
+  classification: PROOF OF CONCEPT - DECISION SUPPORT ONLY
+  disclaimer: >-
+    Demonstration system. Not a certified navigation product. Not for
+    navigation. Simulated data unless explicitly connected to recorded or live
+    vessel sources.
+
+# --- Safeen <2 m requirement (Section 6) ----------------------------------
+requirements:
+  horizontal_error_limit_m: 2.0
+  at_risk_lower_bound_m: 1.5
+  confidence_level: 0.95
+  secondary_confidence_level: 0.99
+  alarm_time_s: 2.0
+  # An "assured" status additionally requires this many independent absolute
+  # position sources to be currently valid.
+  min_independent_absolute_sources: 1
+  # Rate of protection-level growth above which the requirement is flagged
+  # as at-risk even while still below the limit.
+  rapid_uncertainty_growth_m_per_s: 0.05
+  # Below this map-localization confidence the system reports
+  # INSUFFICIENT_INFORMATION rather than guessing.
+  min_map_confidence: 0.25
+  # Maximum age of the newest absolute fix before the solution is treated as
+  # unbounded dead reckoning.
+  max_absolute_fix_age_s: 30
+  # Trailing window over which an absolute source still counts as "currently
+  # valid". Sources publish more slowly than the integrity output, so a strict
+  # per-epoch count would understate the redundancy actually present.
+  absolute_source_window_s: 3.0
+
+# --- GNSS trust and anomaly detection (Section 9) --------------------------
+gnss_integrity:
+  reject_score_below: 20
+  highly_suspect_score_below: 50
+  degraded_score_below: 75
+  acceptable_score_below: 90
+  max_position_innovation_m: 8.0
+  max_velocity_innovation_mps: 2.0
+  max_heading_disagreement_deg: 12.0
+  recovery_validation_s: 30
+  recovery_max_position_difference_m: 3.0
+  recovery_required_consistent_fraction: 0.9
+  # Signal-quality gates
+  min_satellites: 5
+  warn_satellites: 7
+  max_hdop: 4.0
+  warn_hdop: 2.0
+  max_pdop: 6.0
+  min_cn0_dbhz: 32.0
+  warn_cn0_dbhz: 38.0
+  cn0_drop_window_s: 10
+  cn0_drop_alarm_db: 8.0
+  # Kinematic plausibility
+  max_speed_mps: 15.0
+  max_acceleration_mps2: 2.5
+  max_turn_rate_dps: 25.0
+  max_position_jump_m: 15.0
+  # Minimum baseline for kinematic tests. Differencing two noisy fixes over a
+  # very short interval implies impossible speeds from noise alone.
+  kinematic_min_dt_s: 1.0
+  # Sigma multiple allowed for the noise in the differenced positions.
+  kinematic_noise_sigma: 5.0
+  # Gradual drag detector: least-squares drift of the GNSS-minus-fused offset
+  drag_window_s: 30
+  drag_rate_alarm_m_per_s: 0.045
+  drag_min_r2: 0.7
+  # The accumulated offset must also be operationally significant. Combined
+  # with the rate and R^2 tests this detects a 0.1 m/s drag well before the
+  # 20 m required by the acceptance criteria, without flagging normal noise.
+  drag_min_offset_m: 4.0
+  # Frozen coordinate detector
+  frozen_window_s: 8
+  frozen_position_epsilon_m: 0.15
+  frozen_min_vessel_speed_mps: 0.6
+  # Time integrity
+  max_time_offset_s: 1.5
+  max_time_jump_s: 0.75
+  max_message_age_s: 3.0
+  # Independent-source cross-checks. These must trip *before* the residual
+  # monitor would exclude the independent source for disagreeing with a
+  # solution GNSS has already pulled off track.
+  radar_disagreement_m: 6.0
+  lidar_disagreement_m: 4.0
+  bathymetric_disagreement_m: 15.0
+  dead_reckoning_disagreement_m: 12.0
+  # The cross-check threshold is also scaled by the independent source's own
+  # stated uncertainty, so an imprecise source is not treated as an oracle.
+  cross_check_sigma_multiple: 4.0
+  # Map constraints
+  land_violation_enabled: true
+  operating_area_violation_enabled: true
+  # Scoring penalties applied per detected condition (points off 100)
+  penalties:
+    NO_FIX: 100
+    SIGNAL_LOST: 100
+    EXCESSIVE_POSITION_JUMP: 80
+    POSITION_CROSSING_LAND: 75
+    FROZEN_COORDINATES: 70
+    GRADUAL_POSITION_DRAG: 60
+    RADAR_POSITION_DISAGREEMENT: 55
+    LIDAR_POSITION_DISAGREEMENT: 45
+    BATHYMETRIC_POSITION_DISAGREEMENT: 35
+    # Ambiguous conditions: real inconsistencies, but they do not identify GNSS
+    # as the faulty source, so they degrade trust rather than destroy it.
+    DEAD_RECKONING_DISAGREEMENT: 22
+    VELOCITY_DISAGREEMENT: 18
+    HEADING_DISAGREEMENT: 12
+    IMPOSSIBLE_VESSEL_SPEED: 60
+    IMPROBABLE_ACCELERATION: 45
+    IMPOSSIBLE_TURN_RATE: 40
+    GNSS_TIME_JUMP: 55
+    STALE_GNSS_TIMESTAMP: 35
+    OUTSIDE_ALLOWED_WATER_POLYGON: 45
+    SUDDEN_MULTI_SATELLITE_SNR_DROP: 50
+    DEGRADED_SIGNAL_METRICS: 25
+    LOW_SATELLITE_COUNT: 30
+    HIGH_DILUTION_OF_PRECISION: 20
+    CLOCK_BIAS_ANOMALY: 25
+    REPORTED_ACCURACY_IMPLAUSIBLE: 15
+  # Conditions that force an immediate rejection regardless of score arithmetic
+  critical_conditions:
+    - NO_FIX
+    - SIGNAL_LOST
+    - EXCESSIVE_POSITION_JUMP
+    - FROZEN_COORDINATES
+    - POSITION_CROSSING_LAND
+  # Number of consecutive epochs a condition must persist before it is
+  # promoted from "suspected" to "confirmed" (debounce against single outliers)
+  confirm_epochs:
+    default: 2
+    GRADUAL_POSITION_DRAG: 3
+    DEGRADED_SIGNAL_METRICS: 3
+    # A receiver reporting "no fix" is stating a fact about itself, not a
+    # statistical inference. There is nothing to debounce, and using a fix the
+    # receiver has disclaimed would be indefensible.
+    NO_FIX: 1
+    SIGNAL_LOST: 1
+
+# --- Dead reckoning (Section 10.4) -----------------------------------------
+dead_reckoning:
+  maximum_unassisted_duration_s: 120
+  warning_protection_level_m: 1.5
+  critical_protection_level_m: 2.0
+  # Growth model: sigma grows with sqrt(t) from white velocity noise plus a
+  # linear term from residual heading/scale bias.
+  velocity_noise_mps_per_sqrt_s: 0.03
+  heading_bias_deg: 0.15
+  speed_scale_error: 0.004
+  bottom_lock_loss_velocity_sigma_mps: 0.35
+
+# --- Sensor fusion (Section 11) --------------------------------------------
+fusion:
+  filter: EKF
+  # Process noise, continuous-time power spectral densities
+  process_noise:
+    position_m2_per_s: 0.004
+    velocity_m2_per_s3: 0.018
+    heading_deg2_per_s: 0.0025
+    # The gyro-bias state must be free enough to follow a real drifting
+    # compass. Too small and a slowly ramping heading error cannot be absorbed:
+    # it leaks into the track, the independent sources then disagree, and the
+    # platform blames GNSS for a gyro fault.
+    gyro_bias_deg2_per_s3: 0.0002
+    speed_scale_per_s: 0.0000004
+  initial_uncertainty:
+    position_m: 5.0
+    velocity_mps: 0.5
+    heading_deg: 2.0
+    gyro_bias_deg: 0.5
+    speed_scale: 0.02
+  # Chi-square gate applied to normalized innovation squared
+  gating:
+    position_alpha: 0.001
+    velocity_alpha: 0.01
+    heading_alpha: 0.01
+    max_consecutive_gate_failures: 5
+  # Consecutive gate failures from a trusted absolute source after which the
+  # filter is reset onto that source rather than continuing to reject it.
+  divergence_reset_gate_failures: 6
+  # Default measurement noise per sensor type, overridden by sensor config
+  measurement_noise:
+    GNSS: { position_sigma_m: 0.9, velocity_sigma_mps: 0.12 }
+    RADAR: { position_sigma_m: 1.0, heading_sigma_deg: 1.2 }
+    LIDAR: { position_sigma_m: 0.55 }
+    BATHYMETRIC_MATCH: { position_sigma_m: 2.6 }
+    LOCAL_RANGING: { position_sigma_m: 0.35 }
+    DVL: { velocity_sigma_mps: 0.02 }
+    SPEED_LOG: { velocity_sigma_mps: 0.12 }
+    GYRO: { heading_sigma_deg: 0.35 }
+    INS: { position_sigma_m: 3.0, velocity_sigma_mps: 0.06, heading_sigma_deg: 0.12 }
+  # Maximum age of a measurement before it is discarded as stale
+  max_measurement_age_s: 2.5
+  # A sensor excluded by FDE may attempt re-entry after this quiet period
+  sensor_reentry_delay_s: 10
+  sensor_reentry_consistent_epochs: 5
+
+# --- Fault detection, isolation and exclusion (Section 12) -----------------
+fault_detection:
+  residual_window: 40
+  normalized_residual_warn: 3.0
+  normalized_residual_exclude: 5.0
+  chi_square_alpha: 0.001
+  # Multiple of the chi-square critical value at which a sensor is declared
+  # inconsistent. Above 1.0 because the running window mixes measurement
+  # dimensions and the test is deliberately conservative about exclusion.
+  chi_square_exclude_multiplier: 2.0
+  stale_data_s: 3.0
+  missing_data_s: 6.0
+  frozen_value_epochs: 12
+  frozen_value_epsilon: 1.0e-4
+  excessive_noise_ratio: 3.5
+  bias_detection_window: 40
+  bias_threshold_sigma: 2.5
+  # Floor for the bias test, as a fraction of the sensor's declared 1-sigma
+  # uncertainty. Prevents a very precise sensor being excluded for an offset
+  # far below anything operationally meaningful.
+  bias_absolute_floor_fraction: 0.5
+  auto_exclude: true
+  auto_reintegrate: true
+
+# --- Integrity engine (Section 13) -----------------------------------------
+integrity:
+  # HPL = k_conf * sigma_major + fault bias margin + unbounded-DR penalty
+  protection_level:
+    confidence: 0.95
+    # Worst-case undetected bias contributed by a single failed measurement,
+    # approximated as slope * detection threshold (classic RAIM formulation).
+    fault_slope_margin_multiplier: 1.0
+    min_bias_margin_m: 0.15
+    # Additional inflation applied when only one absolute source is available
+    single_source_inflation: 1.35
+    # Inflation applied when no absolute source has been seen recently
+    unbounded_dr_inflation: 1.8
+    max_reported_m: 500
+    # Irreducible slowly varying error per absolute source type, 1 sigma
+    # metres. This is the component a filter cannot average away: GNSS
+    # multipath and antenna lever arm, radar and LiDAR map registration,
+    # bathymetric survey datum and tide model, beacon survey error. Omitting it
+    # makes the protection level shrink below the real error over time.
+    # Sigma multiple beyond which a gap between two contributing absolute
+    # sources stops being explicable as noise and starts counting as an
+    # observed bias that the protection level must carry.
+    disagreement_sigma_multiple: 3.0
+    # How quickly the residual bias left by an excluded source decays as the
+    # surviving sources pull the solution back onto the true position.
+    contamination_decay_s: 8.0
+    default_correlated_sigma_m: 0.8
+    correlated_sigma_m:
+      GNSS: 0.50
+      RADAR: 0.70
+      LIDAR: 0.25
+      BATHYMETRIC_MATCH: 1.50
+      LOCAL_RANGING: 0.12
+      INS: 1.00
+  assured_max_hpl_m: 2.0
+  degraded_max_hpl_m: 3.5
+  min_sensor_diversity_score: 0.35
+  # Solution older than this is reported as UNKNOWN integrity
+  max_solution_age_s: 5.0
+
+# --- Navigation mode manager (Section 5) ------------------------------------
+mode_manager:
+  # Minimum dwell time in a mode before another transition is allowed. Stops
+  # the display flapping between modes on marginal sensor data.
+  min_dwell_s: 3.0
+  # Modes that require explicit operator action to leave
+  latching_modes:
+    - MANUAL_FALLBACK
+  evaluation_hz: 5
+
+# --- Alarms (Section 15.5) --------------------------------------------------
+alarms:
+  # Suppress an identical alarm code from the same source within this window
+  debounce_s: 10
+  # No status alarms while the filter converges from its initial uncertainty.
+  startup_grace_s: 8
+  auto_clear_s: 120
+  max_active: 200
+  severity_for:
+    GNSS_SPOOFING_DETECTED: CRITICAL
+    GNSS_JAMMING_DETECTED: WARNING
+    GNSS_EXCLUDED: WARNING
+    GNSS_DEGRADED: ADVISORY
+    GNSS_RECOVERY_STARTED: INFO
+    GNSS_REINTEGRATED: INFO
+    REQUIREMENT_AT_RISK: WARNING
+    REQUIREMENT_NOT_MET: CRITICAL
+    INTEGRITY_NOT_ASSURED: CRITICAL
+    SENSOR_EXCLUDED: WARNING
+    SENSOR_REINTEGRATED: INFO
+    SENSOR_OFFLINE: ADVISORY
+    SENSOR_STALE: ADVISORY
+    BATHYMETRIC_AMBIGUITY: ADVISORY
+    RADAR_CONFIDENCE_LOW: ADVISORY
+    DVL_BOTTOM_LOCK_LOST: WARNING
+    DEAD_RECKONING_LIMIT: WARNING
+    MODE_TRANSITION: INFO
+    PROTECTION_LEVEL_EXCEEDED: CRITICAL
+    INSUFFICIENT_INFORMATION: WARNING
+
+# --- Simulation defaults (Section 16) --------------------------------------
+simulation:
+  tick_hz: 20
+  default_speed_multiplier: 1.0
+  allowed_speed_multipliers: [0.5, 1, 2, 5, 10]
+  seed: 20240101
+  publish_hz: 5
+  integrity_output_hz: 5
+  vessel:
+    name: SAFEEN SURVEYOR I
+    mmsi: '470123456'
+    length_m: 38.0
+    beam_m: 10.5
+    draft_m: 2.4
+    max_speed_mps: 7.7
+    max_turn_rate_dps: 8.0
+    survey_speed_mps: 2.6
+  environment:
+    origin_latitude: 24.5100
+    origin_longitude: 54.3500
+    tide_amplitude_m: 0.85
+    tide_period_s: 44700
+    sound_velocity_mps: 1530
+    squat_coefficient: 0.012
+
+# --- Geospatial (Section 14) ------------------------------------------------
+geospatial:
+  map_style: dark
+  demonstration_label: Demonstration geospatial data - not for navigation.
+  bathymetry:
+    grid_spacing_m: 4.0
+    grid_half_width_m: 3600
+    grid_half_height_m: 2800
+    # Vertical uncertainty of the stored surface, used by terrain matching
+    map_sigma_m: 0.12
+    # The specification warns against equating grid resolution with accuracy
+    resolution_note: >-
+      A 10 cm bathymetric grid does not imply 10 cm positioning accuracy.
+      Achievable accuracy is governed by seabed distinctiveness, sounder noise,
+      tide and sound-velocity uncertainty, and vessel dynamics.
+
+# --- Data recording and audit (Section 21) ---------------------------------
+recording:
+  record_sensor_messages: true
+  sensor_message_decimation: 1
+  record_residuals: true
+  residual_decimation: 5
+  record_navigation_hz: 5
+  retention_days: 30
+
+# --- Security (Section 22) --------------------------------------------------
+security:
+  password_min_length: 10
+  max_failed_logins: 8
+  lockout_minutes: 15
+  token_expiry: 8h
+  trusted_output_read_only: true
+  max_message_size_bytes: 2097152
+  max_clock_skew_s: 30

@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+**/dist
+**/coverage
+.git
+.github
+.env
+.env.local
+data/exports
+data/generated
+*.log
+logs
+docs
+.vscode
+.idea
+**/*.test.js
+**/*.test.tsx

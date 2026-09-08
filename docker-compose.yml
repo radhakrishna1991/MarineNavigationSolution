@@ -1,0 +1,126 @@
+# iSpatialTec Assured Marine Navigation Platform
+#
+# Brings up PostgreSQL, the backend and the dashboard with no cloud dependency.
+#
+#   cp .env.example .env      # then edit the secrets
+#   docker compose up --build
+#   open http://localhost:8080
+#
+# The backend applies its schema at startup and seeds reference data on first
+# run, so the stack is usable immediately. To populate the analytics screens
+# with history:
+#
+#   docker compose exec backend node scripts/generate_demo_data.js
+
+name: amnp
+
+services:
+  database:
+    image: postgres:17-alpine
+    container_name: amnp-database
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PGDATABASE:-marinenavigation}
+      POSTGRES_USER: ${PGUSER:-AIUSER}
+      POSTGRES_PASSWORD: ${PGPASSWORD:?PGPASSWORD must be set in .env}
+      # Deterministic collation, so ordering does not vary with the host locale.
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+      TZ: UTC
+    volumes:
+      - database-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${PGUSER:-AIUSER} -d ${PGDATABASE:-marinenavigation}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    # Not published to the host by default: the database is an internal
+    # dependency, not part of the platform's interface. Uncomment to inspect it
+    # with psql from the host.
+    # ports:
+    #   - '5432:5432'
+    networks:
+      - amnp-internal
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: amnp-backend
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: UTC
+      BACKEND_PORT: 4000
+      BACKEND_HOST: 0.0.0.0
+      PGHOST: database
+      PGPORT: 5432
+      PGDATABASE: ${PGDATABASE:-marinenavigation}
+      PGUSER: ${PGUSER:-AIUSER}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD must be set in .env}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?SEED_ADMIN_PASSWORD must be set in .env}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:?SEED_DEMO_PASSWORD must be set in .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      ALLOW_ANONYMOUS_VIEWER: ${ALLOW_ANONYMOUS_VIEWER:-false}
+      RECORD_SENSOR_MESSAGES: ${RECORD_SENSOR_MESSAGES:-true}
+      RECORD_SENSOR_DECIMATION: ${RECORD_SENSOR_DECIMATION:-1}
+      # UDP ingestion binds inside the container network only.
+      UDP_INGEST_ENABLED: ${UDP_INGEST_ENABLED:-true}
+      UDP_INGEST_BIND: 0.0.0.0
+      UDP_INGEST_PORT: 5005
+    volumes:
+      # Exports written by scripts/export_results.js land on the host.
+      - ./data/exports:/app/data/exports
+    ports:
+      - '${BACKEND_PORT:-4000}:4000'
+    networks:
+      - amnp-internal
+    # Sensor ingestion is separated from the UI surface (Section 22). On a
+    # vessel this port belongs on a dedicated sensor VLAN.
+    # ports:
+    #   - '5005:5005/udp'
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: amnp-dashboard
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - '${FRONTEND_PORT:-8080}:8080'
+    networks:
+      - amnp-internal
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+volumes:
+  database-data:
+    name: amnp-database-data
+
+networks:
+  amnp-internal:
+    name: amnp-internal
+    driver: bridge

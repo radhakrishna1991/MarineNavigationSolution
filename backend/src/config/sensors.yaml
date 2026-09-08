@@ -1,0 +1,236 @@
+﻿# ---------------------------------------------------------------------------
+# Sensor definitions (Sections 7 and 16).
+#
+# `simulation` holds the error model used by the simulated adapters.
+# `fusion` holds the measurement noise the filter assumes - deliberately kept
+# separate so the demonstration can show what happens when the filter's
+# assumed noise disagrees with reality.
+# ---------------------------------------------------------------------------
+
+sensors:
+  - sensor_id: GNSS_01
+    sensor_type: GNSS
+    name: Primary GNSS Receiver
+    manufacturer_class: Generic multi-constellation GNSS (vendor neutral)
+    interface: NMEA 0183 / IEC 61162-1
+    rate_hz: 5
+    provides: [position, velocity, time]
+    absolute_position_source: true
+    simulation:
+      position_sigma_m: 0.8
+      velocity_sigma_mps: 0.08
+      latency_ms: 120
+      dropout_probability: 0.001
+      nominal_satellites: 14
+      nominal_cn0_dbhz: 45
+      nominal_hdop: 0.8
+      bias_tau_s: 300
+      bias_sigma_m: 0.35
+    fusion:
+      position_sigma_m: 0.9
+      velocity_sigma_mps: 0.12
+
+  - sensor_id: GYRO_01
+    sensor_type: GYRO
+    name: Fibre-Optic Gyrocompass
+    manufacturer_class: Generic FOG gyrocompass (vendor neutral)
+    interface: NMEA 0183 HDT / IEC 61162-1
+    rate_hz: 20
+    provides: [heading]
+    absolute_position_source: false
+    simulation:
+      heading_sigma_deg: 0.08
+      bias_tau_s: 900
+      bias_sigma_deg: 0.12
+      latency_ms: 20
+      dropout_probability: 0.0002
+    fusion:
+      heading_sigma_deg: 0.35
+
+  - sensor_id: DVL_01
+    sensor_type: DVL
+    name: Doppler Velocity Log
+    manufacturer_class: Generic 4-beam DVL (vendor neutral)
+    interface: NMEA 0183 VBW / proprietary binary via adapter
+    rate_hz: 10
+    provides: [velocity, bottom_lock]
+    absolute_position_source: false
+    simulation:
+      velocity_sigma_mps: 0.012
+      scale_error: 0.002
+      bottom_lock_max_depth_m: 120
+      latency_ms: 60
+      dropout_probability: 0.001
+    fusion:
+      velocity_sigma_mps: 0.02
+
+  - sensor_id: SPEEDLOG_01
+    sensor_type: SPEED_LOG
+    name: Electromagnetic Speed Log
+    manufacturer_class: Generic EM speed log (vendor neutral)
+    interface: NMEA 0183 VBW / VHW
+    rate_hz: 5
+    provides: [velocity]
+    absolute_position_source: false
+    simulation:
+      velocity_sigma_mps: 0.09
+      scale_error: 0.015
+      latency_ms: 150
+      dropout_probability: 0.002
+    fusion:
+      velocity_sigma_mps: 0.12
+
+  - sensor_id: RADAR_01
+    sensor_type: RADAR
+    name: X-Band Marine Radar Map Matcher
+    manufacturer_class: Generic marine radar localization adapter (vendor neutral)
+    interface: Radar-derived fix over TCP / point cloud over adapter
+    rate_hz: 2
+    provides: [position, heading]
+    absolute_position_source: true
+    simulation:
+      # Radar performance is a function of how many mapped features are in view
+      max_range_m: 3000
+      min_features_for_fix: 4
+      base_position_sigma_m: 0.9
+      feature_rich_position_sigma_m: 0.6
+      feature_poor_position_sigma_m: 4.5
+      heading_sigma_deg: 0.9
+      latency_ms: 300
+      map_age_days: 45
+    fusion:
+      position_sigma_m: 1.0
+      heading_sigma_deg: 1.2
+
+  - sensor_id: LIDAR_01
+    sensor_type: LIDAR
+    name: Marine LiDAR Localization Unit
+    manufacturer_class: Generic 3D LiDAR localization adapter (vendor neutral)
+    interface: Point cloud via adapter
+    rate_hz: 5
+    provides: [position, heading]
+    absolute_position_source: true
+    simulation:
+      max_range_m: 400
+      min_features_for_fix: 12
+      base_position_sigma_m: 0.25
+      heading_sigma_deg: 0.4
+      latency_ms: 80
+    fusion:
+      position_sigma_m: 0.55
+
+  - sensor_id: ECHO_01
+    sensor_type: ECHO_SOUNDER
+    name: Single-Beam Echo Sounder
+    manufacturer_class: Generic single-beam echo sounder (vendor neutral)
+    interface: NMEA 0183 DBT / DPT
+    rate_hz: 10
+    provides: [depth]
+    absolute_position_source: false
+    simulation:
+      depth_sigma_m: 0.05
+      transducer_offset_m: 1.8
+      latency_ms: 40
+      dropout_probability: 0.002
+    fusion:
+      depth_sigma_m: 0.08
+
+  - sensor_id: MBES_01
+    sensor_type: MULTIBEAM
+    name: Multibeam Echo Sounder
+    manufacturer_class: Generic multibeam sonar (vendor neutral)
+    interface: Survey acquisition system export via adapter
+    rate_hz: 2
+    provides: [depth_profile]
+    absolute_position_source: false
+    simulation:
+      beam_count: 32
+      swath_angle_deg: 120
+      depth_sigma_m: 0.04
+      latency_ms: 250
+    fusion:
+      depth_sigma_m: 0.06
+
+  - sensor_id: BATHY_01
+    sensor_type: BATHYMETRIC_MATCH
+    name: Bathymetric Terrain Matching Engine
+    manufacturer_class: iSpatialTec terrain matching (software)
+    interface: Internal
+    rate_hz: 1
+    provides: [position]
+    absolute_position_source: true
+    simulation:
+      search_radius_m: 60
+      grid_step_m: 3
+      sequence_length: 25
+    fusion:
+      position_sigma_m: 2.6
+
+  - sensor_id: INS_01
+    sensor_type: INS
+    name: Inertial Navigation System (optional)
+    manufacturer_class: Generic MEMS/FOG INS adapter (vendor neutral)
+    interface: Binary via adapter / IEC 61162-450
+    rate_hz: 50
+    optional: true
+    enabled_by_default: true
+    provides: [position, velocity, heading, attitude, heave]
+    absolute_position_source: false
+    simulation:
+      # Drift model: unaided horizontal position error growth
+      position_drift_m_per_s: 0.012
+      velocity_sigma_mps: 0.015
+      heading_sigma_deg: 0.05
+      heading_drift_deg_per_hour: 0.8
+      latency_ms: 10
+    fusion:
+      position_sigma_m: 3.0
+      velocity_sigma_mps: 0.06
+      heading_sigma_deg: 0.12
+
+  - sensor_id: LOCAL_01
+    sensor_type: LOCAL_RANGING
+    name: Local Ranging System (UWB / terrestrial / acoustic)
+    manufacturer_class: Generic local positioning adapter (vendor neutral)
+    interface: UDP / TCP via adapter
+    rate_hz: 2
+    optional: true
+    enabled_by_default: false
+    provides: [position]
+    absolute_position_source: true
+    simulation:
+      technology: TERRESTRIAL_RANGING
+      coverage_radius_m: 1500
+      coverage_centre_offset_east_m: -900
+      coverage_centre_offset_north_m: 450
+      position_sigma_m: 0.25
+      beacon_count: 5
+      latency_ms: 50
+    fusion:
+      position_sigma_m: 0.35
+
+  - sensor_id: AIS_01
+    sensor_type: AIS
+    name: AIS Receiver (advisory only)
+    manufacturer_class: Generic AIS transponder (vendor neutral)
+    interface: NMEA 0183 VDM
+    rate_hz: 0.2
+    advisory_only: true
+    provides: [contacts]
+    absolute_position_source: false
+    simulation:
+      contact_count: 6
+      position_sigma_m: 12
+    fusion: {}
+
+  - sensor_id: TRUTH_01
+    sensor_type: GROUND_TRUTH
+    name: Simulated Ground Truth Reference
+    manufacturer_class: Simulation only - represents RTK reference in a trial
+    interface: Internal
+    rate_hz: 5
+    provides: [position, velocity, heading, depth]
+    absolute_position_source: false
+    excluded_from_fusion: true
+    simulation: {}
+    fusion: {}

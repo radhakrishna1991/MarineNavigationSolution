@@ -1,0 +1,383 @@
+# ---------------------------------------------------------------------------
+# Navigation mode state machine (Section 5).
+#
+# The transitions are DATA, not code. Conditions use a small declarative DSL
+# evaluated by src/navigation/modeManager.js:
+#
+#   { field: <context field>, op: <operator>, value: <literal> }
+#   { all: [ ...conditions ] }   { any: [ ...conditions ] }   { not: <cond> }
+#
+# Operators: eq ne gt gte lt lte in nin contains not_contains truthy falsy
+#
+# There is no expression evaluation and no `eval`; an operator outside the
+# supported list is a configuration error, satisfying the "no arbitrary code
+# execution" requirement of Section 22.
+#
+# Modes are evaluated in ascending `priority` order and the first mode whose
+# `entry` conditions are satisfied - and which is a legal successor of the
+# current mode - becomes the active mode.
+# ---------------------------------------------------------------------------
+
+initial_mode: INTEGRITY_NOT_ASSURED
+
+context_fields:
+  - gnss_present            # a GNSS message was received within the staleness window
+  - gnss_trust_score        # 0..100
+  - gnss_status             # TRUSTED | ACCEPTABLE | DEGRADED | HIGHLY_SUSPECT | REJECTED
+  - gnss_action             # USE_IN_FUSION | DEWEIGHT_IN_FUSION | EXCLUDE_FROM_FUSION | HOLD_FOR_VALIDATION
+  - gnss_conditions         # array of detected condition codes
+  - gnss_used_in_fusion
+  - gnss_recovery_active
+  - gnss_recovery_progress  # 0..1
+  - spoofing_suspected
+  - jamming_suspected
+  - radar_valid
+  - radar_confidence
+  - lidar_valid
+  - lidar_confidence
+  - bathy_valid
+  - bathy_confidence
+  - bathy_ambiguous
+  - local_ranging_valid
+  - ins_enabled
+  - ins_valid
+  - dvl_valid
+  - dvl_bottom_lock
+  - gyro_valid
+  - independent_absolute_sources   # integer count
+  - absolute_fix_age_s
+  - dead_reckoning_duration_s
+  - horizontal_protection_level_m
+  - integrity_status
+  - requirement_status
+  - manual_fallback_requested
+  - solution_available
+
+modes:
+  - id: MANUAL_FALLBACK
+    priority: 5
+    label: Manual Fallback
+    description: >-
+      Automatic navigation output is suspended at operator request. The system
+      continues to display raw sensor values but publishes no trusted position.
+    entry:
+      field: manual_fallback_requested
+      op: truthy
+    active_sensors: []
+    rejected_sensors: [ALL_AUTOMATED_SOURCES]
+    expected_accuracy: Not applicable - operator determined
+    uncertainty_behaviour: Not published
+    operator_alarm: WARNING
+    operator_guidance: >-
+      Automatic navigation assurance is disabled. Determine position by
+      independent means (visual bearings, radar ranges, echo sounder against
+      chart) and record fixes manually.
+    exit: Operator clears manual fallback.
+    next_modes: [INTEGRITY_NOT_ASSURED, DEAD_RECKONING, GNSS_RECOVERY_VALIDATION, NORMAL_GNSS]
+
+  - id: INTEGRITY_NOT_ASSURED
+    priority: 10
+    label: Integrity Not Assured
+    description: >-
+      The system cannot bound the position error at all. This is a fail-safe
+      state, entered when there is no solution, when no absolute source is
+      available and dead reckoning has run beyond its limit, or when the
+      integrity engine reports NOT_ASSURED.
+
+      Note the deliberate separation of concerns: this mode answers "can the
+      error be bounded?". Whether the 2 m requirement is met is a *separate*
+      status, shown alongside. A vessel navigating perfectly well on radar with
+      a 2.6 m protection level has not met the requirement, but its integrity is
+      not "unassured" - it is bounded, and the operator is told the bound. Merging
+      the two would hide which source is actually holding the position.
+    entry:
+      any:
+        - { field: solution_available, op: falsy }
+        - { field: integrity_status, op: eq, value: NOT_ASSURED }
+        - all:
+            - { field: independent_absolute_sources, op: lte, value: 0 }
+            - { field: dead_reckoning_duration_s, op: gt, value: 120 }
+    active_sensors: [ANY_AVAILABLE]
+    rejected_sensors: []
+    expected_accuracy: Unbounded - error cannot be guaranteed
+    uncertainty_behaviour: Growing without an absolute correction
+    operator_alarm: CRITICAL
+    operator_guidance: >-
+      INTEGRITY NOT ASSURED. Verify position using independent means. Consider
+      reducing speed, holding position, or suspending survey operations until an
+      absolute position source is restored.
+    exit: Protection level returns below the limit with a valid absolute source.
+    next_modes:
+      - NORMAL_GNSS
+      - GNSS_DEGRADED
+      - RADAR_AIDED_NAVIGATION
+      - LIDAR_AIDED_NAVIGATION
+      - BATHYMETRIC_AIDED_NAVIGATION
+      - LOCAL_POSITIONING_MODE
+      - INS_AIDED_NAVIGATION
+      - DEAD_RECKONING
+      - GNSS_REJECTED
+      - SPOOFING_SUSPECTED
+      - JAMMING_SUSPECTED
+      - GNSS_RECOVERY_VALIDATION
+      - MANUAL_FALLBACK
+
+  - id: SPOOFING_SUSPECTED
+    priority: 20
+    label: Spoofing Suspected
+    description: >-
+      GNSS is internally self-consistent but disagrees with independent
+      measurements, or shows a signature characteristic of a spoofing attack.
+    entry:
+      all:
+        - { field: spoofing_suspected, op: truthy }
+        - { field: gnss_present, op: truthy }
+    active_sensors: [RADAR, LIDAR, BATHYMETRIC_MATCH, DVL, GYRO, INS, LOCAL_RANGING]
+    rejected_sensors: [GNSS]
+    expected_accuracy: Determined by the surviving absolute sources
+    uncertainty_behaviour: Stable while an independent absolute source is valid
+    operator_alarm: CRITICAL
+    operator_guidance: >-
+      Probable GNSS spoofing. GNSS has been excluded from the navigation
+      solution. Do not accept GNSS-derived positions on any other bridge system
+      until the event is investigated. Report the event.
+    exit: Spoofing indications clear and GNSS passes recovery validation.
+    next_modes: [GNSS_REJECTED, RADAR_AIDED_NAVIGATION, LIDAR_AIDED_NAVIGATION, BATHYMETRIC_AIDED_NAVIGATION, DEAD_RECKONING, GNSS_RECOVERY_VALIDATION, INTEGRITY_NOT_ASSURED]
+
+  - id: JAMMING_SUSPECTED
+    priority: 25
+    label: Jamming Suspected
+    description: >-
+      GNSS signal metrics have collapsed - satellite count, C/N0 or fix
+      availability - consistent with intentional or unintentional interference.
+    entry:
+      all:
+        - { field: jamming_suspected, op: truthy }
+        - { field: spoofing_suspected, op: falsy }
+    active_sensors: [RADAR, LIDAR, BATHYMETRIC_MATCH, DVL, GYRO, INS, LOCAL_RANGING]
+    rejected_sensors: [GNSS]
+    expected_accuracy: Determined by the surviving absolute sources
+    uncertainty_behaviour: Stable while an independent absolute source is valid
+    operator_alarm: WARNING
+    operator_guidance: >-
+      Probable GNSS interference. GNSS is excluded. Maintain visual and radar
+      watch. Record the position and time of the event for reporting.
+    exit: Signal metrics recover and GNSS passes recovery validation.
+    next_modes: [GNSS_REJECTED, RADAR_AIDED_NAVIGATION, LIDAR_AIDED_NAVIGATION, BATHYMETRIC_AIDED_NAVIGATION, DEAD_RECKONING, GNSS_RECOVERY_VALIDATION, INTEGRITY_NOT_ASSURED]
+
+  - id: GNSS_RECOVERY_VALIDATION
+    priority: 30
+    label: GNSS Recovery Validation
+    description: >-
+      GNSS has returned after a rejection. It is being compared against the
+      trusted fused solution for a configurable validation period before it is
+      allowed to influence the navigation solution again.
+    entry:
+      all:
+        - { field: gnss_recovery_active, op: truthy }
+        - { field: gnss_present, op: truthy }
+    active_sensors: [RADAR, LIDAR, BATHYMETRIC_MATCH, DVL, GYRO, INS, LOCAL_RANGING]
+    rejected_sensors: [GNSS]
+    expected_accuracy: Unchanged - GNSS contributes nothing until validated
+    uncertainty_behaviour: Unchanged during validation
+    operator_alarm: INFO
+    operator_guidance: >-
+      GNSS signal has returned and is under validation. It is not yet
+      contributing to the trusted position. No operator action required.
+    exit: Validation period completes with consistent GNSS, or validation fails.
+    next_modes: [NORMAL_GNSS, GNSS_DEGRADED, GNSS_REJECTED, SPOOFING_SUSPECTED, RADAR_AIDED_NAVIGATION, INTEGRITY_NOT_ASSURED]
+
+  - id: GNSS_REJECTED
+    priority: 35
+    label: GNSS Rejected
+    description: >-
+      GNSS has been excluded from fusion by the trust engine and no other
+      aiding source has yet been designated as the primary absolute reference.
+    entry:
+      all:
+        - { field: gnss_action, op: eq, value: EXCLUDE_FROM_FUSION }
+        - { field: independent_absolute_sources, op: lte, value: 0 }
+        - { field: gnss_recovery_active, op: falsy }
+    active_sensors: [DVL, GYRO, INS]
+    rejected_sensors: [GNSS]
+    expected_accuracy: Degrading - no absolute reference
+    uncertainty_behaviour: Growing
+    operator_alarm: WARNING
+    operator_guidance: >-
+      GNSS is rejected and no independent absolute position source is currently
+      valid. Position is being propagated by dead reckoning. Monitor the
+      protection level.
+    exit: An absolute source becomes valid, or GNSS is revalidated.
+    next_modes: [RADAR_AIDED_NAVIGATION, LIDAR_AIDED_NAVIGATION, BATHYMETRIC_AIDED_NAVIGATION, LOCAL_POSITIONING_MODE, DEAD_RECKONING, GNSS_RECOVERY_VALIDATION, INTEGRITY_NOT_ASSURED]
+
+  - id: LOCAL_POSITIONING_MODE
+    priority: 40
+    label: Local Positioning
+    description: >-
+      A local ranging infrastructure (UWB, terrestrial ranging, acoustic
+      LBL/USBL or total-station observations) is providing the absolute fix.
+    entry:
+      all:
+        - { field: local_ranging_valid, op: truthy }
+        - { field: gnss_used_in_fusion, op: falsy }
+    active_sensors: [LOCAL_RANGING, DVL, GYRO, INS, RADAR]
+    rejected_sensors: [GNSS]
+    expected_accuracy: 0.1 - 0.5 m inside the instrumented area
+    uncertainty_behaviour: Bounded inside coverage, growing outside it
+    operator_alarm: INFO
+    operator_guidance: Position is maintained by local infrastructure. Confirm coverage before leaving the instrumented area.
+    exit: Local ranging coverage is lost.
+    next_modes: [RADAR_AIDED_NAVIGATION, BATHYMETRIC_AIDED_NAVIGATION, DEAD_RECKONING, GNSS_RECOVERY_VALIDATION, INTEGRITY_NOT_ASSURED]
+
+  - id: RADAR_AIDED_NAVIGATION
+    priority: 45
+    label: Radar-Aided Navigation
+    description: >-
+      Absolute position is derived from radar map matching against stored
+      shoreline and structure features, aided by gyro and DVL.
+    entry:
+      all:
+        - { field: radar_valid, op: truthy }
+        - { field: radar_confidence, op: gte, value: 0.45 }
+        - { field: gnss_used_in_fusion, op: falsy }
+    active_sensors: [RADAR, GYRO, DVL, SPEED_LOG, ECHO_SOUNDER, INS]
+    rejected_sensors: [GNSS]
+    expected_accuracy: 1 - 3 m depending on feature geometry and map quality
+    uncertainty_behaviour: Bounded while radar features remain observable
+    operator_alarm: ADVISORY
+    operator_guidance: >-
+      Navigating on radar map matching. Maintain awareness of the radar feature
+      environment; accuracy degrades in open water away from mapped structures.
+    exit: Radar match confidence falls or GNSS is revalidated.
+    next_modes: [LIDAR_AIDED_NAVIGATION, BATHYMETRIC_AIDED_NAVIGATION, LOCAL_POSITIONING_MODE, DEAD_RECKONING, GNSS_RECOVERY_VALIDATION, INTEGRITY_NOT_ASSURED, NORMAL_GNSS]
+
+  - id: LIDAR_AIDED_NAVIGATION
+    priority: 50
+    label: LiDAR-Aided Navigation
+    description: >-
+      Absolute position is derived from LiDAR point-cloud matching against a
+      stored quay-side reference cloud. Short range, high precision.
+    entry:
+      all:
+        - { field: lidar_valid, op: truthy }
+        - { field: lidar_confidence, op: gte, value: 0.5 }
+        - { field: gnss_used_in_fusion, op: falsy }
+        - { field: radar_valid, op: falsy }
+    active_sensors: [LIDAR, GYRO, DVL, INS]
+    rejected_sensors: [GNSS]
+    expected_accuracy: 0.3 - 1.0 m within LiDAR range of mapped structures
+    uncertainty_behaviour: Bounded within range, growing beyond it
+    operator_alarm: ADVISORY
+    operator_guidance: Navigating on LiDAR matching. Valid only close to mapped structures.
+    exit: LiDAR range or confidence is lost.
+    next_modes: [RADAR_AIDED_NAVIGATION, BATHYMETRIC_AIDED_NAVIGATION, DEAD_RECKONING, GNSS_RECOVERY_VALIDATION, INTEGRITY_NOT_ASSURED]
+
+  - id: BATHYMETRIC_AIDED_NAVIGATION
+    priority: 55
+    label: Bathymetric-Aided Navigation
+    description: >-
+      Absolute position is derived from matching the observed depth sequence
+      against the stored high-resolution bathymetric surface.
+    entry:
+      all:
+        - { field: bathy_valid, op: truthy }
+        - { field: bathy_ambiguous, op: falsy }
+        - { field: bathy_confidence, op: gte, value: 0.4 }
+        - { field: gnss_used_in_fusion, op: falsy }
+        - { field: radar_valid, op: falsy }
+    active_sensors: [ECHO_SOUNDER, MULTIBEAM, BATHYMETRIC_MATCH, GYRO, DVL, INS]
+    rejected_sensors: [GNSS]
+    expected_accuracy: 2 - 8 m, strongly dependent on seabed distinctiveness
+    uncertainty_behaviour: Bounded over distinctive terrain, growing over flat seabed
+    operator_alarm: ADVISORY
+    operator_guidance: >-
+      Navigating on bathymetric terrain matching. Accuracy depends on seabed
+      relief, tide and sound-velocity corrections. Watch for ambiguity warnings.
+    exit: Terrain becomes ambiguous or depth data is lost.
+    next_modes: [RADAR_AIDED_NAVIGATION, LIDAR_AIDED_NAVIGATION, DEAD_RECKONING, GNSS_RECOVERY_VALIDATION, INTEGRITY_NOT_ASSURED]
+
+  - id: INS_AIDED_NAVIGATION
+    priority: 60
+    label: INS-Aided Navigation
+    description: >-
+      An inertial navigation system is propagating the solution at high rate
+      with no absolute aiding. INS is never treated as drift free.
+    entry:
+      all:
+        - { field: ins_enabled, op: truthy }
+        - { field: ins_valid, op: truthy }
+        - { field: independent_absolute_sources, op: lte, value: 0 }
+        - { field: gnss_used_in_fusion, op: falsy }
+    active_sensors: [INS, GYRO, DVL]
+    rejected_sensors: [GNSS]
+    expected_accuracy: Drift dependent - typically metres within the first minutes
+    uncertainty_behaviour: Growing continuously without absolute aiding
+    operator_alarm: WARNING
+    operator_guidance: >-
+      Position is being maintained by inertial propagation only. Error grows with
+      time. Obtain an absolute fix as soon as possible.
+    exit: An absolute source becomes valid, or the unassisted limit is reached.
+    next_modes: [RADAR_AIDED_NAVIGATION, BATHYMETRIC_AIDED_NAVIGATION, LOCAL_POSITIONING_MODE, DEAD_RECKONING, INTEGRITY_NOT_ASSURED]
+
+  - id: DEAD_RECKONING
+    priority: 65
+    label: Dead Reckoning
+    description: >-
+      Position is propagated from the last trusted fix using gyro heading and
+      DVL or speed-log velocity. No absolute correction is available.
+    entry:
+      all:
+        - { field: independent_absolute_sources, op: lte, value: 0 }
+        - { field: gnss_used_in_fusion, op: falsy }
+        - any:
+            - { field: dvl_valid, op: truthy }
+            - { field: gyro_valid, op: truthy }
+    active_sensors: [GYRO, DVL, SPEED_LOG, INS]
+    rejected_sensors: [GNSS]
+    expected_accuracy: Degrading with elapsed time since the last absolute fix
+    uncertainty_behaviour: Growing - approximately with the square root of time plus a linear bias term
+    operator_alarm: WARNING
+    operator_guidance: >-
+      Dead reckoning only. Monitor the protection level and the elapsed time
+      since the last absolute fix. Prepare to verify position independently.
+    exit: An absolute source becomes valid, or the protection level exceeds the limit.
+    next_modes: [RADAR_AIDED_NAVIGATION, LIDAR_AIDED_NAVIGATION, BATHYMETRIC_AIDED_NAVIGATION, LOCAL_POSITIONING_MODE, GNSS_RECOVERY_VALIDATION, INTEGRITY_NOT_ASSURED, INS_AIDED_NAVIGATION, NORMAL_GNSS, GNSS_DEGRADED, GNSS_REJECTED, SPOOFING_SUSPECTED, JAMMING_SUSPECTED]
+
+  - id: GNSS_DEGRADED
+    priority: 70
+    label: GNSS Degraded
+    description: >-
+      GNSS is still used but with reduced weight because its quality metrics or
+      cross-checks are marginal.
+    entry:
+      all:
+        - { field: gnss_present, op: truthy }
+        - { field: gnss_action, op: in, value: [DEWEIGHT_IN_FUSION] }
+    active_sensors: [GNSS, RADAR, LIDAR, BATHYMETRIC_MATCH, GYRO, DVL, SPEED_LOG, INS]
+    rejected_sensors: []
+    expected_accuracy: 1 - 5 m
+    uncertainty_behaviour: Elevated but bounded
+    operator_alarm: ADVISORY
+    operator_guidance: GNSS quality is reduced. Monitor the GNSS integrity panel.
+    exit: GNSS quality recovers or degrades further.
+    next_modes: [NORMAL_GNSS, SPOOFING_SUSPECTED, JAMMING_SUSPECTED, GNSS_REJECTED, RADAR_AIDED_NAVIGATION, INTEGRITY_NOT_ASSURED]
+
+  - id: NORMAL_GNSS
+    priority: 80
+    label: Normal GNSS
+    description: >-
+      GNSS is healthy and agrees with the independent sensors. It is used as one
+      input among several - never as the sole authority.
+    entry:
+      all:
+        - { field: gnss_present, op: truthy }
+        - { field: gnss_action, op: eq, value: USE_IN_FUSION }
+        - { field: gnss_trust_score, op: gte, value: 76 }
+    active_sensors: [GNSS, RADAR, LIDAR, BATHYMETRIC_MATCH, GYRO, DVL, SPEED_LOG, ECHO_SOUNDER, INS]
+    rejected_sensors: []
+    expected_accuracy: 0.5 - 2 m
+    uncertainty_behaviour: Bounded and stable
+    operator_alarm: INFO
+    operator_guidance: Normal operation. No action required.
+    exit: GNSS trust falls, or an anomaly is detected.
+    next_modes: [GNSS_DEGRADED, SPOOFING_SUSPECTED, JAMMING_SUSPECTED, GNSS_REJECTED, RADAR_AIDED_NAVIGATION, INTEGRITY_NOT_ASSURED, MANUAL_FALLBACK]

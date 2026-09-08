@@ -1,0 +1,216 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Bridge interface base styles.
+ *
+ * Dark, high contrast, and deliberately free of decorative motion. The only
+ * animation in the whole interface is the slow pulse on an unacknowledged
+ * critical alarm, and even that is disabled when the operator or the operating
+ * system asks for reduced motion.
+ */
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-bridge-700;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-bridge-950 text-bridge-100;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'tnum';
+    text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
+  }
+
+  /* Tabular figures everywhere a number is read at a glance: a readout that
+     jitters horizontally as digits change is hard to read on a moving vessel. */
+  .tnum,
+  table,
+  input[type='number'] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-bridge-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-bridge-700 rounded-full border-2 border-bridge-900;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-bridge-600;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-info ring-offset-2 ring-offset-bridge-950;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+
+  .reduced-motion *,
+  .reduced-motion *::before,
+  .reduced-motion *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-lg border border-bridge-700 bg-bridge-900/80 shadow-panel backdrop-blur-sm;
+  }
+
+  .panel-header {
+    @apply flex items-center justify-between gap-3 border-b border-bridge-700 px-4 py-2.5;
+  }
+
+  .panel-title {
+    @apply text-2xs font-semibold uppercase tracking-[0.14em] text-bridge-300;
+  }
+
+  .panel-body {
+    @apply p-4;
+  }
+
+  .readout-label {
+    @apply text-2xs font-medium uppercase tracking-[0.12em] text-bridge-400;
+  }
+
+  .readout-value {
+    @apply font-mono text-2xl font-semibold tabular-nums text-bridge-100;
+  }
+
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm
+           font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .btn-primary {
+    @apply btn border-info/60 bg-info/20 text-info-light hover:bg-info/30 hover:border-info;
+  }
+
+  .btn-secondary {
+    @apply btn border-bridge-600 bg-bridge-800 text-bridge-200 hover:bg-bridge-700 hover:text-bridge-100;
+  }
+
+  .btn-danger {
+    @apply btn border-critical/60 bg-critical/20 text-critical-light hover:bg-critical/30 hover:border-critical;
+  }
+
+  .btn-ghost {
+    @apply btn border-transparent bg-transparent text-bridge-300 hover:bg-bridge-800 hover:text-bridge-100;
+  }
+
+  .btn-sm {
+    @apply px-2.5 py-1.5 text-xs;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-2xs font-semibold uppercase tracking-[0.1em] text-bridge-300;
+  }
+
+  .field-input {
+    @apply w-full rounded-md border border-bridge-600 bg-bridge-950 px-3 py-2 text-sm text-bridge-100
+           placeholder:text-bridge-500 focus:border-info focus:outline-none focus:ring-1 focus:ring-info;
+  }
+
+  .field-error {
+    @apply mt-1.5 flex items-start gap-1.5 text-xs text-critical-light;
+  }
+
+  .field-hint {
+    @apply mt-1.5 text-xs text-bridge-400;
+  }
+
+  .data-table {
+    @apply w-full border-collapse text-sm;
+  }
+
+  .data-table thead th {
+    @apply sticky top-0 z-10 whitespace-nowrap border-b border-bridge-700 bg-bridge-850 px-3 py-2 text-left
+           text-2xs font-semibold uppercase tracking-[0.1em] text-bridge-300;
+  }
+
+  .data-table tbody td {
+    @apply border-b border-bridge-800/70 px-3 py-2 align-middle text-bridge-200;
+  }
+
+  .data-table tbody tr:hover {
+    @apply bg-bridge-800/50;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-2xs font-semibold uppercase tracking-wider;
+  }
+
+  .kv-row {
+    @apply flex items-baseline justify-between gap-4 border-b border-bridge-800/60 py-1.5 last:border-0;
+  }
+
+  .kv-key {
+    @apply shrink-0 text-xs text-bridge-400;
+  }
+
+  .kv-value {
+    @apply text-right font-mono text-xs tabular-nums text-bridge-100;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded bg-bridge-800;
+  }
+}
+
+/* MapLibre overrides so the map reads as part of the bridge interface rather
+   than a web widget dropped into it. */
+.maplibregl-map {
+  font-family: inherit;
+}
+.maplibregl-ctrl-group {
+  @apply !border-bridge-700 !bg-bridge-850 !shadow-panel;
+}
+.maplibregl-ctrl-group button {
+  @apply !bg-bridge-850 !text-bridge-200;
+}
+.maplibregl-ctrl-group button + button {
+  @apply !border-t !border-bridge-700;
+}
+.maplibregl-ctrl-group button:hover {
+  @apply !bg-bridge-700;
+}
+.maplibregl-ctrl-attrib {
+  @apply !bg-bridge-900/80 !text-bridge-400;
+}
+.maplibregl-ctrl-attrib a {
+  @apply !text-bridge-300;
+}
+.maplibregl-popup-content {
+  @apply !rounded-lg !border !border-bridge-600 !bg-bridge-850 !p-0 !text-bridge-100 !shadow-panel;
+}
+.maplibregl-popup-tip {
+  @apply !border-t-bridge-850 !border-b-bridge-850;
+}
+.maplibregl-popup-close-button {
+  @apply !right-1 !top-1 !text-bridge-400 hover:!bg-transparent hover:!text-bridge-100;
+}

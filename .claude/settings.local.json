@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Force E:\\\\ISTProjects\\\\MarineNavigationSolution | Select-Object Mode,Length,Name; Write-Output \"---node---\"; node -v; npm -v; Write-Output \"---psql---\"; try { \\(Get-Command psql -ErrorAction Stop\\).Source } catch { \"psql not on PATH\" })"
+    ]
+  }
+}
