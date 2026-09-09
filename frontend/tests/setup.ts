@@ -9,8 +9,13 @@ afterEach(() => cleanup());
 // records the props it was given.
 vi.mock('maplibre-gl', () => {
   class MockMap {
+    /* The style the map was constructed with, so tests can assert on it. */
+    static lastOptions: Record<string, unknown> | null = null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     handlers: Record<string, any[]> = {};
+    constructor(options: Record<string, unknown>) {
+      MockMap.lastOptions = options;
+    }
     on(event: string, a?: unknown, b?: unknown) {
       const handler = typeof a === 'function' ? a : b;
       this.handlers[event] = this.handlers[event] ?? [];
@@ -34,10 +39,12 @@ vi.mock('maplibre-gl', () => {
       return undefined;
     }
     setLayoutProperty() {}
+    setPaintProperty() {}
     hasImage() {
       return true;
     }
     addImage() {}
+    removeImage() {}
     easeTo() {}
     remove() {}
     getCanvas() {
@@ -129,3 +136,11 @@ if (!global.URL.createObjectURL) {
   global.URL.createObjectURL = () => 'blob:mock';
   global.URL.revokeObjectURL = () => {};
 }
+
+/*
+ * jsdom has no canvas implementation, and calling `getContext` logs a
+ * "Not implemented" error rather than returning null. The map rasterises its
+ * vessel marker to an offscreen canvas and already handles a missing context,
+ * so returning null here exercises that path and keeps the test output clean.
+ */
+HTMLCanvasElement.prototype.getContext = (() => null) as unknown as typeof HTMLCanvasElement.prototype.getContext;

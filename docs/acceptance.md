@@ -277,9 +277,9 @@ network by default.
 
 ## 19. Automated tests pass
 
-**196 tests: 178 backend, 18 frontend.** Run with `npm test`.
+**248 tests: 185 backend, 63 frontend.** Run with `npm test`.
 
-Every one of the nineteen defects listed in [test-plan.md](test-plan.md) §9 was
+Every one of the twenty-one defects listed in [test-plan.md](test-plan.md) §9 was
 found by a test that was written to fail, investigated, and kept.
 
 The API suite requires PostgreSQL; without it, it skips itself loudly and names
@@ -328,7 +328,7 @@ tests need no infrastructure at all.
 | 16 | All events logged | Met — append-only |
 | 17 | Performance report against ground truth | Met — plus MI rate |
 | 18 | Runs on Docker Compose | Met |
-| 19 | Automated tests pass | Met — 196 |
+| 19 | Automated tests pass | Met — 248 |
 | 20 | Setup and demo instructions complete | Met |
 
 **The scope of this acceptance.** These twenty criteria are met by a proof of

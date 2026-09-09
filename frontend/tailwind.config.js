@@ -1,44 +1,50 @@
 /**
  * Tailwind configuration.
  *
- * The palette is built for a bridge: a dark ground that does not destroy night
- * vision, and status colours chosen for contrast against it rather than for
- * decoration. Colour is never the only carrier of meaning in the interface -
- * every status also carries a label and an icon shape - but where colour is
- * used it has to be unambiguous at a distance on a large monitor.
+ * Every colour resolves through a CSS custom property rather than a literal, so
+ * one variable block in `index.css` re-themes the whole interface. That is what
+ * lets the same `bg-bridge-900` / `text-bridge-100` classes used throughout the
+ * pages render correctly in both the dark bridge palette and the light one,
+ * without a `dark:` variant on every element.
+ *
+ * The scale is named by *role*, not by lightness: `bridge-950` is always the
+ * furthest-back ground and `bridge-100` is always the strongest text, whichever
+ * theme is active. Dark inverts the ramp; light does not reverse the meaning.
+ *
+ * Status colours are chosen for contrast against their own theme's ground and
+ * remain distinguishable for the most common forms of colour vision deficiency:
+ * the greens are blue-shifted and the warnings amber rather than orange-red.
+ * Colour is never the only carrier of meaning - every status also renders a
+ * glyph and a label - but where colour is used it must be unambiguous at a
+ * distance on a large monitor.
  */
+
+/** Build a colour that honours Tailwind's opacity modifiers (`bg-x/15`). */
+const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
+
+const ramp = (prefix, steps) =>
+  Object.fromEntries(steps.map((step) => [step, token(`${prefix}-${step}`)]));
+
+const status = (name) => ({
+  DEFAULT: token(name),
+  light: token(`${name}-light`),
+  dark: token(`${name}-dark`)
+});
 
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
-  darkMode: 'class',
+  darkMode: ['class', '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
-        // Ground
-        bridge: {
-          950: '#05080f',
-          900: '#0a0f1a',
-          850: '#0e1626',
-          800: '#131d31',
-          750: '#18243c',
-          700: '#1e2c48',
-          600: '#2a3c5e',
-          500: '#3b5178',
-          400: '#5a739c',
-          300: '#8ba1c4',
-          200: '#b9c9e0',
-          100: '#dde6f2'
-        },
-        // Status. Deliberately distinguishable for the most common forms of
-        // colour vision deficiency: the greens are blue-shifted and the
-        // warnings are amber rather than orange-red.
-        assured: { DEFAULT: '#12b981', dark: '#0b7f5a', light: '#5eead4' },
-        caution: { DEFAULT: '#f0b429', dark: '#a16207', light: '#fde68a' },
-        alert: { DEFAULT: '#f2683c', dark: '#b4441f', light: '#fdba9a' },
-        critical: { DEFAULT: '#ef3f5b', dark: '#a4123a', light: '#fda4b4' },
-        info: { DEFAULT: '#38bdf8', dark: '#0369a1', light: '#bae6fd' },
-        unknown: { DEFAULT: '#8ba1c4', dark: '#475569', light: '#cbd5e1' }
+        bridge: ramp('bridge', [950, 900, 850, 800, 750, 700, 600, 500, 400, 300, 200, 100]),
+        assured: status('assured'),
+        caution: status('caution'),
+        alert: status('alert'),
+        critical: status('critical'),
+        info: status('info'),
+        unknown: status('unknown')
       },
       fontFamily: {
         sans: ['"Inter"', 'system-ui', '-apple-system', '"Segoe UI"', 'Roboto', 'sans-serif'],
@@ -50,9 +56,12 @@ export default {
         'readout-lg': ['3.5rem', { lineHeight: '1', letterSpacing: '-0.03em' }]
       },
       boxShadow: {
-        panel: '0 1px 0 0 rgba(255,255,255,0.04) inset, 0 8px 24px -12px rgba(0,0,0,0.8)',
-        'glow-critical': '0 0 0 1px rgba(239,63,91,0.5), 0 0 24px -4px rgba(239,63,91,0.45)',
-        'glow-assured': '0 0 0 1px rgba(18,185,129,0.4), 0 0 20px -6px rgba(18,185,129,0.35)'
+        // Elevation differs by theme: a dark interface separates surfaces with
+        // a light inner edge, a light one with a real cast shadow.
+        panel: 'var(--shadow-panel)',
+        raised: 'var(--shadow-raised)',
+        'glow-critical': 'var(--shadow-glow-critical)',
+        'glow-assured': 'var(--shadow-glow-assured)'
       },
       animation: {
         // The only motion in the interface: a slow pulse reserved for

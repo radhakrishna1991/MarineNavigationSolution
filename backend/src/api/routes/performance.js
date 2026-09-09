@@ -8,7 +8,7 @@ import { replayService } from '../../services/replayService.js';
 import { configService } from '../../services/configService.js';
 import { scenarioService } from '../../services/scenarioService.js';
 import { Role } from '../../models/enums.js';
-import { asyncHandler, requireAuth, requireRole, validate, audit, q, ingestLimiter } from '../../middleware/index.js';
+import { asyncHandler, requireAuth, requireRole, validate, audit, q, uuidParams, ingestLimiter } from '../../middleware/index.js';
 
 const router = Router();
 
@@ -30,8 +30,9 @@ router.get(
 router.get(
   '/performance/summary',
   requireAuth,
+  validate(z.object({ runId: z.string().uuid().optional() }), 'query'),
   asyncHandler(async (req, res) => {
-    const runId = req.query.runId ?? scenarioService.runId ?? replayService.runId;
+    const runId = q(req).runId ?? scenarioService.runId ?? replayService.runId;
     if (!runId) {
       return res.json({
         available: false,
@@ -66,10 +67,15 @@ router.get(
 router.get(
   '/performance/tracks',
   requireAuth,
+  validate(
+    z.object({ runId: z.string().uuid().optional(), maxPoints: z.coerce.number().min(2).max(20000).default(2000) }),
+    'query'
+  ),
   asyncHandler(async (req, res) => {
-    const target = req.query.runId ?? scenarioService.runId ?? replayService.runId;
+    const { runId, maxPoints } = q(req);
+    const target = runId ?? scenarioService.runId ?? replayService.runId;
     if (!target) return res.json({ run_id: null, fused: [], truth: [], gnss: [] });
-    res.json(await performanceService.tracks(target, { maxPoints: Number(req.query.maxPoints) || 2000 }));
+    res.json(await performanceService.tracks(target, { maxPoints }));
   })
 );
 
@@ -209,6 +215,7 @@ router.post(
 router.post(
   '/replay/:sessionId/start',
   requireAuth,
+  uuidParams('sessionId'),
   requireRole(Role.OPERATOR),
   validate(z.object({ speedMultiplier: z.coerce.number().min(0.1).max(50).default(1) })),
   audit('REPLAY_START', 'replay_session'),
@@ -249,6 +256,7 @@ router.post(
 router.delete(
   '/replay/:sessionId',
   requireAuth,
+  uuidParams('sessionId'),
   requireRole(Role.ENGINEER),
   audit('REPLAY_DELETE', 'replay_session'),
   asyncHandler(async (req, res) => res.json(await replayService.deleteSession(req.params.sessionId)))

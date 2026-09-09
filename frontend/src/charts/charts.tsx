@@ -10,27 +10,36 @@
 import { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
-import { SOURCE_COLOURS } from '../utils/status';
+import { sourceColours } from '../utils/status';
 import { EmptyState } from '../components/ui';
+import { themeColor, themeHex, type ThemeToken } from '../theme/theme';
+import { useResolvedTheme } from '../theme/useTheme';
 
-const AXIS_COLOUR = '#3b5178';
-const TEXT_COLOUR = '#8ba1c4';
-const GRID_COLOUR = '#18243c';
+/*
+ * ECharts takes colour literals, so the charts cannot inherit the palette
+ * through CSS the way the rest of the interface does. These read the same
+ * custom properties at the moment an option object is built, and every chart
+ * lists the resolved theme in its `useMemo` dependencies so the options are
+ * rebuilt when the palette changes.
+ */
+const axisColour = () => themeColor('chart-axis');
+const textColour = () => themeColor('chart-text');
+const gridColour = () => themeColor('chart-grid');
 
 /** Shared axis and grid styling. */
 function baseOption(overrides: EChartsOption = {}): EChartsOption {
   return {
     backgroundColor: 'transparent',
     animation: false,
-    textStyle: { fontFamily: 'Inter, system-ui, sans-serif', color: TEXT_COLOUR, fontSize: 11 },
+    textStyle: { fontFamily: 'Inter, system-ui, sans-serif', color: textColour(), fontSize: 11 },
     grid: { left: 52, right: 18, top: 28, bottom: 32, containLabel: false },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: '#0e1626',
-      borderColor: '#2a3c5e',
+      backgroundColor: themeColor('chart-tooltip-bg'),
+      borderColor: themeColor('chart-tooltip-border'),
       borderWidth: 1,
-      textStyle: { color: '#dde6f2', fontSize: 11 },
-      axisPointer: { type: 'line', lineStyle: { color: '#5a739c', type: 'dashed' } }
+      textStyle: { color: themeColor('chart-tooltip-text'), fontSize: 11 },
+      axisPointer: { type: 'line', lineStyle: { color: themeColor('chart-pointer'), type: 'dashed' } }
     },
     ...overrides
   };
@@ -42,10 +51,10 @@ function timeAxis(name = 'Scenario time (s)') {
     name,
     nameLocation: 'middle' as const,
     nameGap: 22,
-    nameTextStyle: { color: TEXT_COLOUR, fontSize: 10 },
-    axisLine: { lineStyle: { color: AXIS_COLOUR } },
-    axisTick: { lineStyle: { color: AXIS_COLOUR } },
-    axisLabel: { color: TEXT_COLOUR, fontSize: 10 },
+    nameTextStyle: { color: textColour(), fontSize: 10 },
+    axisLine: { lineStyle: { color: axisColour() } },
+    axisTick: { lineStyle: { color: axisColour() } },
+    axisLabel: { color: textColour(), fontSize: 10 },
     splitLine: { show: false }
   };
 }
@@ -54,12 +63,12 @@ function valueAxis(name: string, extra: Record<string, unknown> = {}) {
   return {
     type: 'value' as const,
     name,
-    nameTextStyle: { color: TEXT_COLOUR, fontSize: 10, align: 'left' as const },
+    nameTextStyle: { color: textColour(), fontSize: 10, align: 'left' as const },
     nameGap: 12,
-    axisLine: { lineStyle: { color: AXIS_COLOUR } },
+    axisLine: { lineStyle: { color: axisColour() } },
     axisTick: { show: false },
-    axisLabel: { color: TEXT_COLOUR, fontSize: 10 },
-    splitLine: { lineStyle: { color: GRID_COLOUR } },
+    axisLabel: { color: textColour(), fontSize: 10 },
+    splitLine: { lineStyle: { color: gridColour() } },
     ...extra
   };
 }
@@ -98,13 +107,14 @@ export function ErrorVsProtectionChart({
   height?: number;
   showActual?: boolean;
 }) {
+  const theme = useResolvedTheme();
   const option = useMemo<EChartsOption>(
     () =>
       baseOption({
         legend: {
           top: 0,
           right: 0,
-          textStyle: { color: TEXT_COLOUR, fontSize: 10 },
+          textStyle: { color: textColour(), fontSize: 10 },
           itemWidth: 14,
           itemHeight: 8,
           icon: 'roundRect'
@@ -117,8 +127,8 @@ export function ErrorVsProtectionChart({
             type: 'line',
             showSymbol: false,
             data: data.map((d) => [d.t, d.hpl]),
-            lineStyle: { color: '#f0b429', width: 2 },
-            itemStyle: { color: '#f0b429' },
+            lineStyle: { color: themeColor('caution'), width: 2 },
+            itemStyle: { color: themeColor('caution') },
             areaStyle: { color: 'rgba(240,180,41,0.10)' }
           },
           {
@@ -126,8 +136,8 @@ export function ErrorVsProtectionChart({
             type: 'line',
             showSymbol: false,
             data: data.map((d) => [d.t, d.estimated]),
-            lineStyle: { color: '#38bdf8', width: 1.4, type: 'dashed' },
-            itemStyle: { color: '#38bdf8' }
+            lineStyle: { color: themeColor('chart-series-a'), width: 1.4, type: 'dashed' },
+            itemStyle: { color: themeColor('chart-series-a') }
           },
           ...(showActual
             ? [
@@ -136,8 +146,8 @@ export function ErrorVsProtectionChart({
                   type: 'line' as const,
                   showSymbol: false,
                   data: data.map((d) => [d.t, d.actual]),
-                  lineStyle: { color: SOURCE_COLOURS.fused, width: 1.8 },
-                  itemStyle: { color: SOURCE_COLOURS.fused }
+                  lineStyle: { color: sourceColours().fused, width: 1.8 },
+                  itemStyle: { color: sourceColours().fused }
                 }
               ]
             : []),
@@ -149,14 +159,14 @@ export function ErrorVsProtectionChart({
             markLine: {
               silent: true,
               symbol: 'none',
-              label: { formatter: `${limit} m limit`, color: '#12b981', fontSize: 10, position: 'insideEndTop' },
-              lineStyle: { color: '#12b981', type: 'dashed', width: 1.5 },
+              label: { formatter: `${limit} m limit`, color: themeColor('assured'), fontSize: 10, position: 'insideEndTop' },
+              lineStyle: { color: themeColor('assured'), type: 'dashed', width: 1.5 },
               data: [{ yAxis: limit }]
             }
           }
         ]
       }),
-    [data, limit, showActual]
+    [data, limit, showActual, theme]
   );
 
   if (data.length === 0) {
@@ -173,6 +183,7 @@ export function TrustScoreChart({
   data: Array<{ t: number; trust: number | null }>;
   height?: number;
 }) {
+  const theme = useResolvedTheme();
   const option = useMemo<EChartsOption>(
     () =>
       baseOption({
@@ -184,22 +195,22 @@ export function TrustScoreChart({
             type: 'line',
             showSymbol: false,
             data: data.map((d) => [d.t, d.trust]),
-            lineStyle: { color: '#38bdf8', width: 2 },
-            itemStyle: { color: '#38bdf8' },
+            lineStyle: { color: themeColor('chart-series-a'), width: 2 },
+            itemStyle: { color: themeColor('chart-series-a') },
             markArea: {
               silent: true,
               itemStyle: { opacity: 0.12 },
               data: [
-                [{ yAxis: 0, itemStyle: { color: '#ef3f5b' } }, { yAxis: 20 }],
-                [{ yAxis: 20, itemStyle: { color: '#f2683c' } }, { yAxis: 50 }],
-                [{ yAxis: 50, itemStyle: { color: '#f0b429' } }, { yAxis: 75 }],
-                [{ yAxis: 75, itemStyle: { color: '#12b981' } }, { yAxis: 100 }]
+                [{ yAxis: 0, itemStyle: { color: themeColor('critical') } }, { yAxis: 20 }],
+                [{ yAxis: 20, itemStyle: { color: themeColor('alert') } }, { yAxis: 50 }],
+                [{ yAxis: 50, itemStyle: { color: themeColor('caution') } }, { yAxis: 75 }],
+                [{ yAxis: 75, itemStyle: { color: themeColor('assured') } }, { yAxis: 100 }]
               ]
             }
           }
         ]
       }),
-    [data]
+    [data, theme]
   );
 
   if (data.length === 0) return <EmptyState title="No GNSS trust history yet" icon="◈" />;
@@ -214,24 +225,25 @@ export function ModeTimelineChart({
   data: Array<{ t: number; mode: string }>;
   height?: number;
 }) {
+  const theme = useResolvedTheme();
   const option = useMemo<EChartsOption>(() => {
     const modes = [...new Set(data.map((d) => d.mode))];
     const modeIndex = new Map(modes.map((m, i) => [m, i]));
     const tone: Record<string, string> = {
-      NORMAL_GNSS: '#12b981',
-      GNSS_DEGRADED: '#f0b429',
-      SPOOFING_SUSPECTED: '#ef3f5b',
-      JAMMING_SUSPECTED: '#f2683c',
-      GNSS_REJECTED: '#f0b429',
-      RADAR_AIDED_NAVIGATION: '#38bdf8',
-      LIDAR_AIDED_NAVIGATION: '#a78bfa',
-      BATHYMETRIC_AIDED_NAVIGATION: '#22d3ee',
-      DEAD_RECKONING: '#f97316',
-      INS_AIDED_NAVIGATION: '#f97316',
-      LOCAL_POSITIONING_MODE: '#84cc16',
-      MANUAL_FALLBACK: '#ef3f5b',
-      GNSS_RECOVERY_VALIDATION: '#38bdf8',
-      INTEGRITY_NOT_ASSURED: '#ef3f5b'
+      NORMAL_GNSS: themeColor('assured'),
+      GNSS_DEGRADED: themeColor('caution'),
+      SPOOFING_SUSPECTED: themeColor('critical'),
+      JAMMING_SUSPECTED: themeColor('alert'),
+      GNSS_REJECTED: themeColor('caution'),
+      RADAR_AIDED_NAVIGATION: themeColor('chart-series-a'),
+      LIDAR_AIDED_NAVIGATION: themeColor('chart-series-d'),
+      BATHYMETRIC_AIDED_NAVIGATION: themeColor('chart-series-e'),
+      DEAD_RECKONING: themeColor('chart-series-f'),
+      INS_AIDED_NAVIGATION: themeColor('chart-series-f'),
+      LOCAL_POSITIONING_MODE: themeColor('chart-series-g'),
+      MANUAL_FALLBACK: themeColor('critical'),
+      GNSS_RECOVERY_VALIDATION: themeColor('chart-series-a'),
+      INTEGRITY_NOT_ASSURED: themeColor('critical')
     };
     return baseOption({
       grid: { left: 190, right: 18, top: 12, bottom: 32 },
@@ -239,16 +251,16 @@ export function ModeTimelineChart({
       yAxis: {
         type: 'category',
         data: modes.map((m) => m.replace(/_/g, ' ')),
-        axisLine: { lineStyle: { color: AXIS_COLOUR } },
+        axisLine: { lineStyle: { color: axisColour() } },
         axisTick: { show: false },
-        axisLabel: { color: TEXT_COLOUR, fontSize: 10 },
+        axisLabel: { color: textColour(), fontSize: 10 },
         splitLine: { show: false }
       },
       tooltip: {
         trigger: 'item',
-        backgroundColor: '#0e1626',
-        borderColor: '#2a3c5e',
-        textStyle: { color: '#dde6f2', fontSize: 11 },
+        backgroundColor: themeColor('chart-tooltip-bg'),
+        borderColor: themeColor('chart-tooltip-border'),
+        textStyle: { color: themeColor('chart-tooltip-text'), fontSize: 11 },
         formatter: (p: any) => `${p.value[0].toFixed(1)} s<br/>${modes[p.value[1]]?.replace(/_/g, ' ')}`
       },
       series: [
@@ -257,12 +269,12 @@ export function ModeTimelineChart({
           symbolSize: 5,
           data: data.map((d) => ({
             value: [d.t, modeIndex.get(d.mode) ?? 0],
-            itemStyle: { color: tone[d.mode] ?? '#8ba1c4' }
+            itemStyle: { color: tone[d.mode] ?? themeColor('unknown') }
           }))
         }
       ]
     });
-  }, [data]);
+  }, [data, theme]);
 
   if (data.length === 0) return <EmptyState title="No mode history yet" icon="⬡" />;
   return <Chart option={option} height={height} />;
@@ -276,12 +288,13 @@ export function RequirementTimelineChart({
   data: Array<{ t: number; requirement: string }>;
   height?: number;
 }) {
+  const theme = useResolvedTheme();
   const option = useMemo<EChartsOption>(() => {
     const colour: Record<string, string> = {
-      REQUIREMENT_MET: '#12b981',
-      REQUIREMENT_AT_RISK: '#f0b429',
-      REQUIREMENT_NOT_MET: '#ef3f5b',
-      INSUFFICIENT_INFORMATION: '#8ba1c4'
+      REQUIREMENT_MET: themeColor('assured'),
+      REQUIREMENT_AT_RISK: themeColor('caution'),
+      REQUIREMENT_NOT_MET: themeColor('critical'),
+      INSUFFICIENT_INFORMATION: themeColor('unknown')
     };
     return baseOption({
       grid: { left: 52, right: 18, top: 10, bottom: 32 },
@@ -289,9 +302,9 @@ export function RequirementTimelineChart({
       yAxis: { type: 'value', min: 0, max: 1, show: false },
       tooltip: {
         trigger: 'item',
-        backgroundColor: '#0e1626',
-        borderColor: '#2a3c5e',
-        textStyle: { color: '#dde6f2', fontSize: 11 },
+        backgroundColor: themeColor('chart-tooltip-bg'),
+        borderColor: themeColor('chart-tooltip-border'),
+        textStyle: { color: themeColor('chart-tooltip-text'), fontSize: 11 },
         formatter: (p: any) => `${p.value[0].toFixed(1)} s<br/>${p.data.status.replace(/_/g, ' ')}`
       },
       series: [
@@ -301,12 +314,12 @@ export function RequirementTimelineChart({
           data: data.map((d) => ({
             value: [d.t, 1],
             status: d.requirement,
-            itemStyle: { color: colour[d.requirement] ?? '#8ba1c4' }
+            itemStyle: { color: colour[d.requirement] ?? themeColor('unknown') }
           }))
         }
       ]
     });
-  }, [data]);
+  }, [data, theme]);
 
   if (data.length === 0) return <EmptyState title="No compliance history yet" icon="◫" />;
   return <Chart option={option} height={height} />;
@@ -317,7 +330,7 @@ export function LineChart({
   data,
   label,
   unit,
-  colour = '#38bdf8',
+  colour = 'chart-series-a',
   height = 180,
   markLineAt,
   markLineLabel
@@ -325,11 +338,12 @@ export function LineChart({
   data: SeriesPoint[];
   label: string;
   unit?: string;
-  colour?: string;
+  colour?: ThemeToken;
   height?: number;
   markLineAt?: number;
   markLineLabel?: string;
 }) {
+  const theme = useResolvedTheme();
   const option = useMemo<EChartsOption>(
     () =>
       baseOption({
@@ -341,16 +355,16 @@ export function LineChart({
             type: 'line',
             showSymbol: false,
             data: data.map((d) => [d.t, d.value]),
-            lineStyle: { color: colour, width: 1.8 },
-            itemStyle: { color: colour },
-            areaStyle: { color: `${colour}18` },
+            lineStyle: { color: themeHex(colour), width: 1.8 },
+            itemStyle: { color: themeHex(colour) },
+            areaStyle: { color: `${themeHex(colour)}18` },
             ...(markLineAt !== undefined
               ? {
                   markLine: {
                     silent: true,
                     symbol: 'none',
-                    label: { formatter: markLineLabel ?? String(markLineAt), color: '#f0b429', fontSize: 10 },
-                    lineStyle: { color: '#f0b429', type: 'dashed' },
+                    label: { formatter: markLineLabel ?? String(markLineAt), color: themeColor('caution'), fontSize: 10 },
+                    lineStyle: { color: themeColor('caution'), type: 'dashed' },
                     data: [{ yAxis: markLineAt }]
                   }
                 }
@@ -358,7 +372,7 @@ export function LineChart({
           }
         ]
       }),
-    [data, label, unit, colour, markLineAt, markLineLabel]
+    [data, label, unit, colour, markLineAt, markLineLabel, theme]
   );
 
   if (data.length === 0) return <EmptyState title={`No ${label.toLowerCase()} data yet`} icon="◫" />;
@@ -370,15 +384,16 @@ export function BarChart({
   data,
   unit,
   height = 240,
-  colour = '#38bdf8',
+  colour = 'chart-series-a',
   max
 }: {
-  data: Array<{ label: string; value: number; colour?: string }>;
+  data: Array<{ label: string; value: number; colour?: ThemeToken }>;
   unit?: string;
   height?: number;
-  colour?: string;
+  colour?: ThemeToken;
   max?: number;
 }) {
+  const theme = useResolvedTheme();
   const option = useMemo<EChartsOption>(
     () =>
       baseOption({
@@ -387,26 +402,26 @@ export function BarChart({
         yAxis: {
           type: 'category',
           data: data.map((d) => d.label),
-          axisLine: { lineStyle: { color: AXIS_COLOUR } },
+          axisLine: { lineStyle: { color: axisColour() } },
           axisTick: { show: false },
-          axisLabel: { color: TEXT_COLOUR, fontSize: 10 }
+          axisLabel: { color: textColour(), fontSize: 10 }
         },
         series: [
           {
             type: 'bar',
-            data: data.map((d) => ({ value: d.value, itemStyle: { color: d.colour ?? colour, borderRadius: [0, 3, 3, 0] } })),
+            data: data.map((d) => ({ value: d.value, itemStyle: { color: themeHex(d.colour ?? colour), borderRadius: [0, 3, 3, 0] } })),
             barMaxWidth: 16,
             label: {
               show: true,
               position: 'right',
-              color: TEXT_COLOUR,
+              color: textColour(),
               fontSize: 10,
               formatter: (p: any) => `${Number(p.value).toFixed(1)}${unit ? ` ${unit}` : ''}`
             }
           }
         ]
       }),
-    [data, unit, colour, max]
+    [data, unit, colour, max, theme]
   );
 
   if (data.length === 0) return <EmptyState title="No data" icon="◫" />;
@@ -423,6 +438,7 @@ export function ErrorDistributionChart({
   limit: number;
   height?: number;
 }) {
+  const theme = useResolvedTheme();
   const option = useMemo<EChartsOption>(() => {
     if (values.length === 0) return baseOption({});
     const max = Math.max(...values, limit * 1.2);
@@ -441,9 +457,9 @@ export function ErrorDistributionChart({
         name: 'error (m)',
         nameLocation: 'middle',
         nameGap: 22,
-        nameTextStyle: { color: TEXT_COLOUR, fontSize: 10 },
-        axisLine: { lineStyle: { color: AXIS_COLOUR } },
-        axisLabel: { color: TEXT_COLOUR, fontSize: 9, interval: 3 }
+        nameTextStyle: { color: textColour(), fontSize: 10 },
+        axisLine: { lineStyle: { color: axisColour() } },
+        axisLabel: { color: textColour(), fontSize: 9, interval: 3 }
       },
       yAxis: valueAxis('epochs'),
       series: [
@@ -451,13 +467,13 @@ export function ErrorDistributionChart({
           type: 'bar',
           data: counts.map((c, i) => ({
             value: c,
-            itemStyle: { color: (i + 0.5) * width > limit ? '#ef3f5b' : '#12b981', opacity: 0.8 }
+            itemStyle: { color: (i + 0.5) * width > limit ? themeColor('critical') : themeColor('assured'), opacity: 0.8 }
           })),
           barCategoryGap: '10%'
         }
       ]
     });
-  }, [values, limit]);
+  }, [values, limit, theme]);
 
   if (values.length === 0) return <EmptyState title="No error samples" icon="◫" />;
   return <Chart option={option} height={height} />;
@@ -466,15 +482,16 @@ export function ErrorDistributionChart({
 /** Compact sparkline for tiles. */
 export function Sparkline({
   data,
-  colour = '#38bdf8',
+  colour = 'chart-series-a',
   height = 40,
   limit
 }: {
   data: Array<number | null>;
-  colour?: string;
+  colour?: ThemeToken;
   height?: number;
   limit?: number;
 }) {
+  const theme = useResolvedTheme();
   const option = useMemo<EChartsOption>(
     () => ({
       animation: false,
@@ -488,15 +505,15 @@ export function Sparkline({
           type: 'line',
           data,
           showSymbol: false,
-          lineStyle: { color: colour, width: 1.5 },
-          areaStyle: { color: `${colour}22` },
+          lineStyle: { color: themeHex(colour), width: 1.5 },
+          areaStyle: { color: `${themeHex(colour)}22` },
           ...(limit !== undefined
             ? {
                 markLine: {
                   silent: true,
                   symbol: 'none',
                   label: { show: false },
-                  lineStyle: { color: '#f0b429', type: 'dashed', width: 1 },
+                  lineStyle: { color: themeColor('caution'), type: 'dashed', width: 1 },
                   data: [{ yAxis: limit }]
                 }
               }
@@ -504,7 +521,7 @@ export function Sparkline({
         }
       ]
     }),
-    [data, colour, limit]
+    [data, colour, limit, theme]
   );
 
   if (data.length < 2) return <div style={{ height }} />;
@@ -519,10 +536,11 @@ export function SignalQualityChart({
   data: Array<{ t: number; cn0: number | null; satellites: number | null; hdop: number | null }>;
   height?: number;
 }) {
+  const theme = useResolvedTheme();
   const option = useMemo<EChartsOption>(
     () =>
       baseOption({
-        legend: { top: 0, right: 0, textStyle: { color: TEXT_COLOUR, fontSize: 10 }, itemWidth: 14, itemHeight: 8 },
+        legend: { top: 0, right: 0, textStyle: { color: textColour(), fontSize: 10 }, itemWidth: 14, itemHeight: 8 },
         grid: { left: 44, right: 44, top: 28, bottom: 32 },
         xAxis: timeAxis(),
         yAxis: [
@@ -536,8 +554,8 @@ export function SignalQualityChart({
             showSymbol: false,
             yAxisIndex: 0,
             data: data.map((d) => [d.t, d.cn0]),
-            lineStyle: { color: '#38bdf8', width: 1.8 },
-            itemStyle: { color: '#38bdf8' }
+            lineStyle: { color: themeColor('chart-series-a'), width: 1.8 },
+            itemStyle: { color: themeColor('chart-series-a') }
           },
           {
             name: 'Satellites',
@@ -545,8 +563,8 @@ export function SignalQualityChart({
             showSymbol: false,
             yAxisIndex: 1,
             data: data.map((d) => [d.t, d.satellites]),
-            lineStyle: { color: '#12b981', width: 1.5 },
-            itemStyle: { color: '#12b981' }
+            lineStyle: { color: themeColor('assured'), width: 1.5 },
+            itemStyle: { color: themeColor('assured') }
           },
           {
             name: 'HDOP',
@@ -554,12 +572,12 @@ export function SignalQualityChart({
             showSymbol: false,
             yAxisIndex: 1,
             data: data.map((d) => [d.t, d.hdop]),
-            lineStyle: { color: '#f0b429', width: 1.3, type: 'dashed' },
-            itemStyle: { color: '#f0b429' }
+            lineStyle: { color: themeColor('caution'), width: 1.3, type: 'dashed' },
+            itemStyle: { color: themeColor('caution') }
           }
         ]
       }),
-    [data]
+    [data, theme]
   );
 
   if (data.length === 0) return <EmptyState title="No GNSS signal history yet" icon="◈" />;

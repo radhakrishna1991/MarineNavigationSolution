@@ -12,6 +12,7 @@ import { useAppDispatch, useAppSelector } from '../store';
 import { sidebarToggled, toastDismissed } from '../store/uiSlice';
 import { signedOut } from '../store/authSlice';
 import { CompactStatus } from './StatusBanner';
+import { ThemeToggle } from './ThemeToggle';
 import { SEVERITY_PRESENTATION } from '../utils/status';
 import { hasRole } from '../store/authSlice';
 import type { Role } from '../types';
@@ -173,6 +174,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <ConnectionPill />
           <AlarmBell />
+          <div className="hidden md:block">
+            <ThemeToggle compact />
+          </div>
           <div className="hidden items-center gap-2 border-l border-bridge-700 pl-2 sm:flex">
             <div className="text-right">
               <p className="text-xs font-medium leading-tight text-bridge-200">{user?.full_name ?? user?.username}</p>
@@ -226,7 +230,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             ))}
           </ul>
 
-          <div className="border-t border-bridge-700 p-3">
+          <div className="space-y-3 border-t border-bridge-700 p-3">
+            <div className="md:hidden">
+              <p className="mb-1.5 text-2xs font-semibold uppercase tracking-[0.1em] text-bridge-400">Theme</p>
+              <ThemeToggle />
+            </div>
             <p className="text-[10px] leading-relaxed text-bridge-500">
               Demonstration geospatial data — not for navigation. This platform has no control interface to
               autopilot, DP, propulsion or steering gear.

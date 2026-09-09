@@ -7,7 +7,7 @@
  * sensor table updates, and that the map mounts.
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithStore } from './renderWithStore';
@@ -18,6 +18,9 @@ import { SensorsPage } from '../src/pages/SensorsPage';
 import { AlarmsPage } from '../src/pages/AlarmsPage';
 import { MapView } from '../src/map/MapView';
 import { navigationReceived } from '../src/store/liveSlice';
+import { ThemeToggle } from '../src/components/ThemeToggle';
+import { resolveTheme, sourceColours } from '../src/theme/theme';
+import { useApplyTheme } from '../src/theme/useTheme';
 
 describe('status banner', () => {
   it('shows the 2 m requirement as met when it is met', () => {
@@ -337,5 +340,113 @@ describe('role-based access in the interface', () => {
       responses: { '/alarms': { items: [makeAlarm()], total: 1, active_now: [], summary: {} } }
     });
     expect(await screen.findByRole('button', { name: 'Acknowledge all' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Theme (Section 27, "responsive layout" and "colour is not the only indicator").
+ *
+ * Dark is the operational default and has to stay that way: a light screen on a
+ * bridge at night destroys the watchkeeper's dark adaptation. Light exists for
+ * daylight work, briefings and printed screenshots.
+ */
+describe('theme', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.removeAttribute('data-theme');
+  });
+
+  /**
+   * The same arrangement as `App`: the root applies the resolved theme to the
+   * document and the toggle changes the preference. Testing them together is
+   * the point - a toggle that updates the store but not the document would
+   * pass a narrower test and be useless.
+   */
+  function ThemedApp() {
+    useApplyTheme();
+    return <ThemeToggle />;
+  }
+
+  it('defaults to the dark bridge palette', () => {
+    const { store } = renderWithStore(<ThemedApp />);
+    expect(store.getState().ui.theme).toBe('dark');
+    expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+
+  it('switches the document to the light palette when light is chosen', async () => {
+    const user = userEvent.setup();
+    const { store } = renderWithStore(<ThemedApp />);
+
+    await user.click(screen.getByRole('radio', { name: /light/i }));
+
+    expect(store.getState().ui.theme).toBe('light');
+    expect(document.documentElement.dataset.theme).toBe('light');
+    // `color-scheme` is what makes native scrollbars and form controls follow.
+    expect(document.documentElement.style.colorScheme).toBe('light');
+  });
+
+  it('remembers the choice across a reload', async () => {
+    const user = userEvent.setup();
+    renderWithStore(<ThemedApp />);
+    await user.click(screen.getByRole('radio', { name: /light/i }));
+
+    const persisted = JSON.parse(localStorage.getItem('amnp.preferences') ?? '{}');
+    expect(persisted.theme).toBe('light');
+  });
+
+  it('offers dark, light and follow-the-system, with the current one marked', async () => {
+    const user = userEvent.setup();
+    renderWithStore(<ThemedApp />);
+
+    const options = screen.getAllByRole('radio');
+    expect(options).toHaveLength(3);
+    // The active option is identified by state, not by colour alone.
+    expect(screen.getByRole('radio', { name: /dark/i })).toHaveAttribute('aria-checked', 'true');
+
+    await user.click(screen.getByRole('radio', { name: /auto/i }));
+    expect(screen.getByRole('radio', { name: /auto/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /dark/i })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('resolves the system preference rather than assuming one', () => {
+    expect(resolveTheme('dark')).toBe('dark');
+    expect(resolveTheme('light')).toBe('light');
+    // jsdom reports no match for the light query, so system means dark here -
+    // the same fallback the platform uses when it cannot ask.
+    expect(resolveTheme('system')).toBe('dark');
+  });
+
+  it('keeps a distinct colour per positioning source in both palettes', () => {
+    const colours = sourceColours();
+    const values = Object.values(colours);
+    expect(values).toHaveLength(new Set(values).size);
+    expect(colours.fused).not.toBe(colours.gnss);
+  });
+});
+
+/**
+ * Map style.
+ *
+ * The map is built from a hand-written MapLibre style with no external tile or
+ * glyph server. MapLibre validates that style strictly and fails the whole load
+ * on a malformed property - and a map that fails to load is silent: no error
+ * reaches the operator, the panel simply stays empty. This guards the specific
+ * shape that broke it.
+ */
+describe('map style', () => {
+  it('omits the glyphs property rather than setting it undefined', async () => {
+    renderWithStore(<MapView navigation={makeNavigation()} />, { responses: {} });
+
+    const maplibre = (await import('maplibre-gl')).default as unknown as {
+      Map: { lastOptions: { style: Record<string, unknown> } | null };
+    };
+    const style = maplibre.Map.lastOptions?.style;
+    expect(style).toBeTruthy();
+
+    // `glyphs: undefined` still counts as present and fails validation with
+    // "glyphs: string expected, undefined found", which stops the style
+    // loading, so `load` never fires and no layer is ever added.
+    expect(Object.prototype.hasOwnProperty.call(style!, 'glyphs')).toBe(false);
+    expect(style!.version).toBe(8);
   });
 });

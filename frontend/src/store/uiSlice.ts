@@ -1,6 +1,7 @@
 /** Interface preferences and transient notifications. */
 
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { applyTheme, resolveTheme, type ThemePreference } from '../theme/theme';
 
 const PREF_KEY = 'amnp.preferences';
 
@@ -40,11 +41,17 @@ interface UiState {
   selectedRunId: string | null;
   demoPanelOpen: boolean;
   reducedMotion: boolean;
+  /**
+   * Dark is the default and stays the default: on a bridge at night a light
+   * screen destroys the watchkeeper's dark adaptation. Light is for daylight
+   * operation, briefings and printed screenshots.
+   */
+  theme: ThemePreference;
 }
 
 const defaultLayers: MapLayerVisibility = {
   bathymetry: true,
-  contours: false,
+  contours: true,
   land: true,
   operatingArea: true,
   noGo: true,
@@ -79,7 +86,8 @@ function persistPreferences(state: UiState) {
         mapLayers: state.mapLayers,
         mapFollowVessel: state.mapFollowVessel,
         units: state.units,
-        reducedMotion: state.reducedMotion
+        reducedMotion: state.reducedMotion,
+        theme: state.theme
       })
     );
   } catch {
@@ -97,7 +105,8 @@ const initialState: UiState = {
   toasts: [],
   selectedRunId: null,
   demoPanelOpen: false,
-  reducedMotion: stored.reducedMotion ?? false
+  reducedMotion: stored.reducedMotion ?? false,
+  theme: stored.theme ?? 'dark'
 };
 
 let toastCounter = 0;
@@ -130,6 +139,14 @@ const uiSlice = createSlice({
       state.reducedMotion = !state.reducedMotion;
       persistPreferences(state);
     },
+    themeChanged(state, action: PayloadAction<ThemePreference>) {
+      state.theme = action.payload;
+      persistPreferences(state);
+      // Applied here rather than in a component effect so the document updates
+      // in the same tick as the click, with no intermediate frame in the old
+      // palette.
+      applyTheme(resolveTheme(action.payload), { animate: true });
+    },
     runSelected(state, action: PayloadAction<string | null>) {
       state.selectedRunId = action.payload;
     },
@@ -161,6 +178,7 @@ export const {
   followVesselToggled,
   unitsChanged,
   reducedMotionToggled,
+  themeChanged,
   runSelected,
   demoPanelToggled,
   toastAdded,

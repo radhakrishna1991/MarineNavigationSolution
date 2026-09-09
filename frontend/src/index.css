@@ -3,17 +3,213 @@
 @tailwind utilities;
 
 /**
- * Bridge interface base styles.
+ * Interface base styles.
  *
- * Dark, high contrast, and deliberately free of decorative motion. The only
- * animation in the whole interface is the slow pulse on an unacknowledged
- * critical alarm, and even that is disabled when the operator or the operating
- * system asks for reduced motion.
+ * Two themes, one set of class names. Every colour in the application resolves
+ * through a custom property, so the blocks below are the only place either
+ * palette is defined - no component carries a `dark:` variant.
+ *
+ * The scale is named by role, not by lightness. `--bridge-950` is always the
+ * furthest-back ground and `--bridge-100` is always the strongest text; the
+ * dark theme runs the ramp one way and the light theme the other, so
+ * `text-bridge-100` on `bg-bridge-950` is legible either way.
+ *
+ * Dark remains the default. This is a bridge display: at night a light screen
+ * destroys the watchkeeper's dark adaptation, and that is a safety property
+ * rather than a preference. Light exists for daylight use, for projectors and
+ * for printed screenshots.
+ *
+ * Values are space-separated RGB channels so Tailwind's opacity modifiers
+ * (`bg-assured/15`) work against them.
  */
 
 @layer base {
-  :root {
+  /* ---------------------------------------------------------------- dark -- */
+  :root,
+  [data-theme='dark'] {
     color-scheme: dark;
+
+    --bridge-950: 5 8 15;
+    --bridge-900: 10 15 26;
+    --bridge-850: 14 22 38;
+    --bridge-800: 19 29 49;
+    --bridge-750: 24 36 60;
+    --bridge-700: 30 44 72;
+    --bridge-600: 42 60 94;
+    --bridge-500: 59 81 120;
+    --bridge-400: 106 130 170;
+    --bridge-300: 139 161 196;
+    --bridge-200: 185 201 224;
+    --bridge-100: 221 230 242;
+
+    /* Status: vivid enough to read against a dark ground at a distance. */
+    --assured: 18 185 129;
+    --assured-light: 94 234 212;
+    --assured-dark: 11 127 90;
+    --caution: 240 180 41;
+    --caution-light: 253 230 138;
+    --caution-dark: 161 98 7;
+    --alert: 242 104 60;
+    --alert-light: 253 186 154;
+    --alert-dark: 180 68 31;
+    --critical: 239 63 91;
+    --critical-light: 253 164 180;
+    --critical-dark: 164 18 58;
+    --info: 56 189 248;
+    --info-light: 186 230 253;
+    --info-dark: 3 105 161;
+    --unknown: 139 161 196;
+    --unknown-light: 203 213 225;
+    --unknown-dark: 71 85 105;
+
+    /* Surfaces separate by a light inner edge and a deep cast shadow. */
+    --panel-alpha: 0.8;
+    --panel-blur: 6px;
+    --shadow-panel: 0 1px 0 0 rgb(255 255 255 / 0.04) inset, 0 8px 24px -12px rgb(0 0 0 / 0.8);
+    --shadow-raised: 0 1px 0 0 rgb(255 255 255 / 0.05) inset, 0 16px 40px -12px rgb(0 0 0 / 0.85);
+    --shadow-glow-critical: 0 0 0 1px rgb(239 63 91 / 0.5), 0 0 24px -4px rgb(239 63 91 / 0.45);
+    --shadow-glow-assured: 0 0 0 1px rgb(18 185 129 / 0.4), 0 0 20px -6px rgb(18 185 129 / 0.35);
+
+    /* Tint strength behind status chips and rows. */
+    --tint-strength: 0.15;
+    --tint-strength-strong: 0.22;
+
+    /* Canvas layers (map, charts) read these directly - see theme.ts. */
+    --map-ground: 5 8 15;
+    --map-backdrop: 9 26 45;
+    --map-land: 42 60 94;
+    --map-land-edge: 90 115 156;
+    --map-graticule: 59 81 120;
+    --map-halo: 5 8 15;
+    --map-depth-0: 30 58 95;
+    --map-depth-1: 26 77 122;
+    --map-depth-2: 21 97 143;
+    --map-depth-3: 15 111 158;
+    --map-depth-4: 10 127 174;
+    --map-depth-5: 8 145 178;
+    --map-depth-6: 14 116 144;
+
+    --chart-axis: 59 81 120;
+    --chart-text: 139 161 196;
+    --chart-grid: 24 36 60;
+    --chart-tooltip-bg: 14 22 38;
+    --chart-tooltip-border: 42 60 94;
+    --chart-tooltip-text: 221 230 242;
+    --chart-pointer: 90 115 156;
+    --chart-series-a: 56 189 248;
+    --chart-series-b: 18 185 129;
+    --chart-series-c: 240 180 41;
+    --chart-series-d: 167 139 250;
+    --chart-series-e: 34 211 238;
+    --chart-series-f: 249 115 22;
+    --chart-series-g: 132 204 22;
+
+    /* Source identity colours. One per positioning source, used identically on
+       the map, in the legend and in the charts so a colour always means the
+       same source wherever it appears. */
+    --source-fused: 18 185 129;
+    --source-truth: 240 180 41;
+    --source-gnss: 239 63 91;
+    --source-radar: 56 189 248;
+    --source-lidar: 167 139 250;
+    --source-bathymetric: 34 211 238;
+    --source-dead-reckoning: 249 115 22;
+    --source-local-ranging: 132 204 22;
+  }
+
+  /* --------------------------------------------------------------- light -- */
+  [data-theme='light'] {
+    color-scheme: light;
+
+    /* Cool neutrals with a faint blue cast: an instrument panel in daylight,
+       not a document. Panels are white and the app ground sits behind them. */
+    --bridge-950: 238 242 247;
+    --bridge-900: 255 255 255;
+    --bridge-850: 244 247 251;
+    --bridge-800: 232 238 246;
+    --bridge-750: 221 229 240;
+    --bridge-700: 203 214 228;
+    --bridge-600: 168 184 205;
+    --bridge-500: 100 120 143;
+    --bridge-400: 84 104 129;
+    --bridge-300: 61 80 104;
+    --bridge-200: 37 52 74;
+    --bridge-100: 13 27 44;
+
+    /* Status hues darkened until each clears 4.5:1 against a white panel. The
+       `-dark` step stays vivid: it is the marker fill on the map, where the
+       colour sits on its own ground rather than behind text. */
+    --assured: 4 120 87;
+    --assured-light: 6 95 70;
+    --assured-dark: 16 185 129;
+    --caution: 146 89 12;
+    --caution-light: 124 72 15;
+    --caution-dark: 240 180 41;
+    --alert: 194 65 12;
+    --alert-light: 154 52 18;
+    --alert-dark: 242 104 60;
+    --critical: 190 18 60;
+    --critical-light: 159 18 57;
+    --critical-dark: 239 63 91;
+    --info: 3 105 161;
+    --info-light: 7 89 133;
+    --info-dark: 56 189 248;
+    --unknown: 71 85 105;
+    --unknown-light: 51 65 85;
+    --unknown-dark: 148 163 184;
+
+    /* Surfaces separate by a real cast shadow rather than an inner highlight. */
+    --panel-alpha: 1;
+    --panel-blur: 0px;
+    --shadow-panel: 0 1px 2px 0 rgb(15 30 50 / 0.05), 0 1px 3px -1px rgb(15 30 50 / 0.08);
+    --shadow-raised: 0 10px 30px -10px rgb(15 30 50 / 0.22), 0 2px 6px -2px rgb(15 30 50 / 0.1);
+    --shadow-glow-critical: 0 0 0 1px rgb(190 18 60 / 0.35), 0 6px 20px -8px rgb(190 18 60 / 0.35);
+    --shadow-glow-assured: 0 0 0 1px rgb(4 120 87 / 0.3), 0 6px 18px -8px rgb(4 120 87 / 0.28);
+
+    /* A 15 % tint of a dark hue on white is already strong; ease it off. */
+    --tint-strength: 0.1;
+    --tint-strength-strong: 0.16;
+
+    --map-ground: 233 240 248;
+    --map-backdrop: 205 224 240;
+    /* Land in buff, as on a paper chart: it separates from water by hue as well
+       as by lightness, which a grey landmass on pale blue does not. */
+    --map-land: 234 224 199;
+    --map-land-edge: 150 133 96;
+    --map-graticule: 150 175 200;
+    --map-halo: 255 255 255;
+    --map-depth-0: 198 228 246;
+    --map-depth-1: 166 210 240;
+    --map-depth-2: 133 190 232;
+    --map-depth-3: 100 168 222;
+    --map-depth-4: 68 143 206;
+    --map-depth-5: 40 115 183;
+    --map-depth-6: 20 88 156;
+
+    --chart-axis: 168 184 205;
+    --chart-text: 84 104 129;
+    --chart-grid: 226 232 240;
+    --chart-tooltip-bg: 255 255 255;
+    --chart-tooltip-border: 203 214 228;
+    --chart-tooltip-text: 13 27 44;
+    --chart-pointer: 100 120 143;
+    --chart-series-a: 2 132 199;
+    --chart-series-b: 4 120 87;
+    --chart-series-c: 180 83 9;
+    --chart-series-d: 109 40 217;
+    --chart-series-e: 14 116 144;
+    --chart-series-f: 194 65 12;
+    --chart-series-g: 77 124 15;
+
+    /* Same identities, darkened until each is legible against a white panel. */
+    --source-fused: 4 120 87;
+    --source-truth: 180 83 9;
+    --source-gnss: 190 18 60;
+    --source-radar: 2 132 199;
+    --source-lidar: 109 40 217;
+    --source-bathymetric: 14 116 144;
+    --source-dead-reckoning: 194 65 12;
+    --source-local-ranging: 77 124 15;
   }
 
   * {
@@ -46,17 +242,32 @@
     height: 10px;
   }
   ::-webkit-scrollbar-track {
-    @apply bg-bridge-900;
+    @apply bg-bridge-950;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-bridge-700 rounded-full border-2 border-bridge-900;
+    @apply rounded-full border-2 border-transparent bg-bridge-600 bg-clip-content;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-bridge-600;
+    @apply bg-bridge-500;
   }
 
   :focus-visible {
     @apply outline-none ring-2 ring-info ring-offset-2 ring-offset-bridge-950;
+  }
+
+  /* Switching theme repaints the whole interface at once. A brief colour
+     transition makes that read as one deliberate change rather than a flash,
+     and it is applied only while the switch is in progress so nothing else
+     carries a permanent transition cost. */
+  [data-theme-switching] *,
+  [data-theme-switching] *::before,
+  [data-theme-switching] *::after {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease,
+      fill 180ms ease,
+      box-shadow 180ms ease !important;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -79,7 +290,9 @@
 
 @layer components {
   .panel {
-    @apply rounded-lg border border-bridge-700 bg-bridge-900/80 shadow-panel backdrop-blur-sm;
+    @apply rounded-lg border border-bridge-700 shadow-panel;
+    background-color: rgb(var(--bridge-900) / var(--panel-alpha));
+    backdrop-filter: blur(var(--panel-blur));
   }
 
   .panel-header {
@@ -108,15 +321,23 @@
   }
 
   .btn-primary {
-    @apply btn border-info/60 bg-info/20 text-info-light hover:bg-info/30 hover:border-info;
+    @apply btn border-info/60 text-info-light hover:border-info;
+    background-color: rgb(var(--info) / var(--tint-strength-strong));
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: rgb(var(--info) / calc(var(--tint-strength-strong) + 0.1));
   }
 
   .btn-secondary {
-    @apply btn border-bridge-600 bg-bridge-800 text-bridge-200 hover:bg-bridge-700 hover:text-bridge-100;
+    @apply btn border-bridge-600 bg-bridge-800 text-bridge-200 hover:bg-bridge-750 hover:text-bridge-100;
   }
 
   .btn-danger {
-    @apply btn border-critical/60 bg-critical/20 text-critical-light hover:bg-critical/30 hover:border-critical;
+    @apply btn border-critical/60 text-critical-light hover:border-critical;
+    background-color: rgb(var(--critical) / var(--tint-strength-strong));
+  }
+  .btn-danger:hover:not(:disabled) {
+    background-color: rgb(var(--critical) / calc(var(--tint-strength-strong) + 0.1));
   }
 
   .btn-ghost {
@@ -182,8 +403,8 @@
   }
 }
 
-/* MapLibre overrides so the map reads as part of the bridge interface rather
-   than a web widget dropped into it. */
+/* MapLibre overrides so the map reads as part of the interface rather than a
+   web widget dropped into it. These follow the theme with everything else. */
 .maplibregl-map {
   font-family: inherit;
 }
@@ -197,7 +418,14 @@
   @apply !border-t !border-bridge-700;
 }
 .maplibregl-ctrl-group button:hover {
-  @apply !bg-bridge-700;
+  @apply !bg-bridge-800;
+}
+/* MapLibre ships black control glyphs; invert them on the dark ground only. */
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1) brightness(1.35);
+}
+[data-theme='light'] .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: none;
 }
 .maplibregl-ctrl-attrib {
   @apply !bg-bridge-900/80 !text-bridge-400;
@@ -206,10 +434,11 @@
   @apply !text-bridge-300;
 }
 .maplibregl-popup-content {
-  @apply !rounded-lg !border !border-bridge-600 !bg-bridge-850 !p-0 !text-bridge-100 !shadow-panel;
+  @apply !rounded-lg !border !border-bridge-600 !bg-bridge-850 !p-0 !text-bridge-100 !shadow-raised;
 }
 .maplibregl-popup-tip {
-  @apply !border-t-bridge-850 !border-b-bridge-850;
+  border-top-color: rgb(var(--bridge-850)) !important;
+  border-bottom-color: rgb(var(--bridge-850)) !important;
 }
 .maplibregl-popup-close-button {
   @apply !right-1 !top-1 !text-bridge-400 hover:!bg-transparent hover:!text-bridge-100;

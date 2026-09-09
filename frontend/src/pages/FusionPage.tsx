@@ -118,7 +118,7 @@ export function FusionPage() {
         </div>
         <div className="panel px-4 py-3">
           <Readout
-            label="Estimated error"
+            label="Estimated horizontal error"
             value={number(integrity.estimated_horizontal_error_m)}
             unit="m"
             hint="Expected magnitude from the covariance"
@@ -233,6 +233,12 @@ export function FusionPage() {
                 <KeyValue label="Last absolute fix from" value={integrity.last_absolute_fix_source ?? EM_DASH} />
                 <KeyValue label="Time since absolute fix" value={duration(integrity.time_since_last_absolute_fix_s)} />
                 <KeyValue label="Dead-reckoning duration" value={duration(integrity.dead_reckoning_duration_s)} />
+                <KeyValue
+                  label="Uncertainty growth rate"
+                  value={`${number(integrity.protection_level_growth_rate_m_per_s, 3)} m/s`}
+                  title="How fast the protection level is opening up. Sustained positive growth means the bound will cross the limit; the time remaining is on the navigation screen."
+                  tone={integrity.protection_level_growth_rate_m_per_s > 0.05 ? 'caution' : undefined}
+                />
                 <KeyValue label="Solution age" value={duration(integrity.solution_age_s)} />
                 <KeyValue label="Sensor diversity" value={`${(integrity.sensor_diversity_score * 100).toFixed(0)} %`} />
                 <KeyValue label="Measurement principles" value={integrity.measurement_principles.length} />
@@ -271,7 +277,7 @@ export function FusionPage() {
 
               <div>
                 <p className="panel-title mb-2">Independent absolute sources over time</p>
-                <LineChart data={sourcesSeries} label="Absolute sources" unit="count" colour="#12b981" height={160} />
+                <LineChart data={sourcesSeries} label="Absolute sources" unit="count" colour="assured" height={160} />
               </div>
               <div>
                 <p className="panel-title mb-2">Dead-reckoning duration</p>
@@ -279,7 +285,7 @@ export function FusionPage() {
                   data={drSeries}
                   label="DR duration"
                   unit="s"
-                  colour="#f97316"
+                  colour="chart-series-f"
                   markLineAt={120}
                   markLineLabel="unassisted limit"
                   height={160}

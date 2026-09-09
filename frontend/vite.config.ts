@@ -12,7 +12,31 @@ export default defineConfig({
     // reverse proxy.
     proxy: {
       '/api': { target: 'http://localhost:4000', changeOrigin: true },
-      '/ws': { target: 'ws://localhost:4000', ws: true }
+      '/ws': {
+        target: 'ws://localhost:4000',
+        ws: true,
+        /*
+         * The backend runs under `node --watch`, so every save restarts it and
+         * drops every open WebSocket. http-proxy raises that as an unhandled
+         * socket error and Vite prints it as `ws proxy socket error: read
+         * ECONNRESET` - which reads like a fault when it is a normal restart,
+         * and is alarming to have on screen during a demonstration.
+         *
+         * Expected disconnects are swallowed. A backend that is not running is
+         * still reported, but as one actionable line rather than a stack trace,
+         * because that one the developer does need to know about.
+         */
+        configure(proxy) {
+          proxy.on('error', (err: NodeJS.ErrnoException) => {
+            if (err.code === 'ECONNRESET' || err.code === 'EPIPE') return;
+            if (err.code === 'ECONNREFUSED') {
+              console.warn('[ws proxy] backend not reachable on :4000 - is it running?');
+              return;
+            }
+            console.error(`[ws proxy] ${err.message}`);
+          });
+        }
+      }
     }
   },
   preview: { port: 4173, host: true },

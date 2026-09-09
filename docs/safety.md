@@ -75,6 +75,21 @@ path that renders a bare coloured dot. The status palette is additionally
 blue-shifted in the greens and amber in the warnings, so the states remain
 distinguishable under the common forms of colour vision deficiency.
 
+This holds in both palettes. The interface ships a dark theme and a light one;
+each defines its own status hues, because a green that reads well against a
+near-black ground is illegible against white. Every text colour in both clears
+WCAG AA at 4.5:1 against the two surfaces it is ever set on, and every
+positioning source keeps a distinct identity colour. Those are properties the
+test suite measures directly from the stylesheet rather than leaving to
+judgement.
+
+**Dark is the default and should stay the default in service.** A light display
+on a darkened bridge destroys the watchkeeper's night vision, and recovering it
+takes many minutes. The light theme exists for daylight operation, for
+briefings and projectors, and for screenshots that will be printed. Nothing in
+the platform switches the theme on its own except the explicit
+follow-the-operating-system setting, which the operator has to choose.
+
 Every status also appears as text in the main banner:
 
 ```

@@ -27,10 +27,11 @@ import {
   INTEGRITY_PRESENTATION,
   REQUIREMENT_PRESENTATION,
   SEVERITY_PRESENTATION,
-  SOURCE_COLOURS,
+  sourceColours,
   TRUST_PRESENTATION,
   modePresentation,
-  sensorTone
+  sensorTone,
+  type SourceKey
 } from '../utils/status';
 import { useAcknowledgeAlarmMutation } from '../api/api';
 import { alarmAcknowledgedLocally } from '../store/liveSlice';
@@ -126,7 +127,7 @@ function IntegrityPanel({ navigation }: { navigation: NavigationOutput }) {
       </div>
 
       <div className="mt-3">
-        <Sparkline data={sparkData} colour="#f0b429" limit={limit} height={36} />
+        <Sparkline data={sparkData} colour="caution" limit={limit} height={36} />
       </div>
 
       <div className="mt-3">
@@ -193,7 +194,7 @@ function IntegrityPanel({ navigation }: { navigation: NavigationOutput }) {
 
 function SourcesPanel({ navigation }: { navigation: NavigationOutput }) {
   const localization = navigation.localization;
-  const entries: Array<{ key: keyof typeof SOURCE_COLOURS; label: string; valid: boolean; detail: string }> = [
+  const entries: Array<{ key: SourceKey; label: string; valid: boolean; detail: string }> = [
     {
       key: 'radar',
       label: 'Radar map matching',
@@ -245,8 +246,8 @@ function SourcesPanel({ navigation }: { navigation: NavigationOutput }) {
               aria-hidden
               className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full border"
               style={{
-                borderColor: SOURCE_COLOURS[entry.key],
-                backgroundColor: entry.valid ? SOURCE_COLOURS[entry.key] : 'transparent'
+                borderColor: sourceColours()[entry.key],
+                backgroundColor: entry.valid ? sourceColours()[entry.key] : 'transparent'
               }}
             />
             <div className="min-w-0 flex-1">

@@ -96,7 +96,7 @@ placeholders only.
 | `RATE_LIMIT_*` `MAX_REQUEST_BODY_BYTES` | Request limits |
 | `UDP_INGEST_*` | Simulated UDP sensor listener, loopback-bound by default |
 | `RECORD_SENSOR_MESSAGES` `RECORDER_*` | Recording volume and batching |
-| `VITE_API_BASE_URL` `VITE_WS_URL` | Dashboard build-time endpoints |
+| `VITE_API_BASE_URL` `VITE_WS_URL` | Optional. Only to point the dashboard at a backend on another origin — and Vite reads them from `frontend/.env`, not the root `.env`. Unset by default, so the dashboard uses relative URLs proxied by Vite in development and nginx in the container |
 | `ALLOW_ANONYMOUS_VIEWER` | Read-only demo access without sign-in. Off by default |
 
 **Navigation behaviour** — thresholds, noise models, sensor definitions, modes
@@ -175,9 +175,16 @@ implemented — see [docs/limitations.md](docs/limitations.md) §3.
 
 ## Screens
 
-**Navigation** — the main operational display: status banner, map with the
-trusted position plotted separately from raw GNSS and ground truth, position and
-uncertainty panels, mode and guidance.
+**Navigation** — the main operational display: status banner, chart, position
+and uncertainty panels, mode and guidance.
+
+The chart draws the surveyed seabed as a shaded relief raster with depth
+contours, a buff landmass and coastline, the dredged channel, the operating
+area, no-go zones, the planned route and the survey control points — with the
+trusted position plotted separately from raw GNSS, ground truth and each
+contributing sensor's own fix. The camera frames the survey area on load, and
+the colour ramp spans the surveyed depth range so the shape of the seabed reads
+at a glance in both palettes.
 **Sensors** — every sensor with its decision, reason, residuals and last message.
 **GNSS integrity** — trust score, active conditions, evidence, classification,
 recovery countdown.
@@ -191,10 +198,20 @@ error and protection level kept distinct.
 (engineer).
 **Administration** — users, roles, audit log (administrator).
 
-Dark, high-contrast, desktop-first, laid out for a bridge monitor; responsive
-down to a phone. Colour is never the only indicator. No decorative animation —
-the only motion is the critical-alarm pulse, and it respects
-`prefers-reduced-motion`.
+**Two palettes.** Dark is the default and the operational one: on a bridge at
+night a light screen destroys the watchkeeper's dark adaptation. Light is for
+daylight work, briefings, projectors and printed screenshots. A third setting
+follows the operating system. The choice is in the header and is remembered.
+
+Every colour in the interface resolves through a CSS custom property, so both
+palettes are defined in one file and no component carries a per-theme variant.
+Every text colour in both palettes clears WCAG AA (4.5:1) against the surfaces
+it is used on, and that is asserted by a test rather than assumed.
+
+Desktop-first, laid out for a bridge monitor; responsive down to a phone.
+Colour is never the only indicator — every status carries a glyph and a label.
+No decorative animation — the only motion is the critical-alarm pulse, and it
+respects `prefers-reduced-motion`.
 
 **Roles:** `viewer` (read-only) · `operator` (run scenarios, acknowledge alarms,
 generate reports) · `engineer` (inject faults, ingest data, change configuration,
@@ -211,16 +228,16 @@ Seeding creates one account per role — `admin`, `engineer`, `operator`,
 ## Testing
 
 ```bash
-npm test              # 196 tests
-npm run test:backend  # 178 (Jest)
-npm run test:frontend # 18 (Vitest + React Testing Library)
+npm test              # 248 tests
+npm run test:backend  # 185 (Jest)
+npm run test:frontend # 63 (Vitest + React Testing Library)
 ```
 
 The API suite needs PostgreSQL; without it, it skips itself loudly and names the
 reason rather than passing while testing nothing. The other 123 backend tests
 need no infrastructure at all.
 
-Eighteen real defects found by this suite — filter divergence, a bias test that
+Twenty-one real defects found by this suite — filter divergence, a bias test that
 excluded every healthy sensor, an isolation logic that removed the honest sensor
 instead of the lying one — are documented with their fixes in
 [docs/test-plan.md](docs/test-plan.md) §9.
@@ -238,6 +255,7 @@ instead of the lying one — are documented with their fixes in
 | [docs/safety.md](docs/safety.md) | Fail-safe behaviour, alarm philosophy, known undetectable conditions |
 | [docs/security.md](docs/security.md) | Implemented controls, deliberate placeholders, production requirements |
 | [docs/test-plan.md](docs/test-plan.md) | The suite, the measured results, the defects it found |
+| [docs/scenarios.md](docs/scenarios.md) | What each of the fifteen scenarios does, in plain language — written to be handed to an operator or a customer |
 | [docs/demo-script.md](docs/demo-script.md) | Running the Safeen demonstration |
 | [docs/roadmap.md](docs/roadmap.md) | Phases 1–6, with exit criteria and how it could fail |
 | [docs/acceptance.md](docs/acceptance.md) | The 20 acceptance criteria, each with its evidence |
@@ -259,10 +277,10 @@ backend/
     api/           routes, middleware, app
     ws/            live hub
     db/            migrations, seeds, pool
-  tests/           178 Jest tests
+  tests/           185 Jest tests
 frontend/
   src/             pages, components, map, charts, store, api, ws, hooks
-  tests/           18 Vitest + RTL tests
+  tests/           63 Vitest + RTL tests
 scripts/           generate_demo_data, run_scenario, export_results, seed_database
 docs/              the ten documents above
 ```

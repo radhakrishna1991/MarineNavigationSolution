@@ -15,6 +15,7 @@ import { DemoPage } from './pages/DemoPage';
 import { ConfigPage } from './pages/ConfigPage';
 import { AdminPage } from './pages/AdminPage';
 import { hasRole } from './store/authSlice';
+import { useApplyTheme } from './theme/useTheme';
 import type { Role } from './types';
 
 /**
@@ -91,6 +92,10 @@ function LiveConnection() {
 
 export function App() {
   const token = useAppSelector((s) => s.auth.token);
+  // Keeps `data-theme` on the document in step with the stored preference, and
+  // follows the operating system while that preference is `system`. Mounted
+  // above the sign-in screen so the login page is themed too.
+  useApplyTheme();
 
   if (!token) {
     return (

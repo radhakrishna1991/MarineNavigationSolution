@@ -178,6 +178,10 @@ performance report, so these claims can be checked rather than taken on trust.
 - **Recording is best-effort.** A database failure degrades the audit trail; it
   never stalls or corrupts the navigation solution. Dropped rows are counted and
   surfaced in the system status.
+- **The chart is a visualisation, not a chart product.** The seabed shading, the
+  depth palette and the relief lighting exist to make the terrain legible; they
+  are not IHO or S-52 symbology, and no estimator reads them. Terrain matching
+  works from the numeric depth grid, never from the rendered pixels.
 - **The dashboard is desktop-first.** It is laid out for a large bridge monitor.
   It is responsive and usable on a tablet, and legible on a phone, but the dense
   engineering panels assume width.

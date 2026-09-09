@@ -17,7 +17,10 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { useAppDispatch, useAppSelector } from '../store';
 import { followVesselToggled, mapLayerToggled } from '../store/uiSlice';
 import { useBathymetryQuery, useGeoBundleQuery } from '../api/api';
-import { SOURCE_COLOURS, SOURCE_LABELS } from '../utils/status';
+import { sourceColours, SOURCE_LABELS, type SourceKey } from '../utils/status';
+import { themeHex } from '../theme/theme';
+import { buildBathymetryImage } from './bathymetryRaster';
+import { useResolvedTheme } from '../theme/useTheme';
 import { latitudeDm, longitudeDm, metres, EM_DASH } from '../utils/format';
 import type { NavigationOutput } from '../types';
 import { Toggle } from '../components/ui';
@@ -63,16 +66,6 @@ function ellipsePolygon(
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
-/** Colour ramp for the depth raster, shallow to deep. */
-const DEPTH_RAMP: Array<[number, string]> = [
-  [0, '#1e3a5f'],
-  [4, '#1a4d7a'],
-  [8, '#15618f'],
-  [12, '#0f6f9e'],
-  [16, '#0a7fae'],
-  [22, '#0891b2'],
-  [30, '#0e7490']
-];
 
 export function MapView({
   navigation,
@@ -88,23 +81,34 @@ export function MapView({
   const [ready, setReady] = useState(false);
   const [cursor, setCursor] = useState<{ lat: number; lon: number } | null>(null);
   const [layerPanelOpen, setLayerPanelOpen] = useState(false);
+  // The camera is fitted to the survey area once, on the first load. Doing it
+  // every time the bundle re-resolves would yank the view back while an
+  // operator was looking somewhere else.
+  const fitted = useRef(false);
 
   const dispatch = useAppDispatch();
+  // MapLibre paint properties are literals, so unlike the CSS-styled chrome the
+  // map has to be told when the palette changes.
+  const theme = useResolvedTheme();
   const layers = useAppSelector((s) => s.ui.mapLayers);
   const follow = useAppSelector((s) => s.ui.mapFollowVessel);
   const trails = useAppSelector((s) => s.live.trails);
 
   const { data: bundle } = useGeoBundleQuery();
-  const { data: bathymetry } = useBathymetryQuery(14);
+  const { data: bathymetry } = useBathymetryQuery(8);
 
   // --- Style ---------------------------------------------------------------
   const style = useMemo<StyleSpecification>(
     () => ({
       version: 8,
-      // No external glyph server: labels use no-glyph symbol layers only.
-      glyphs: undefined,
+      // No `glyphs` key at all. There is no glyph server - every symbol layer
+      // here is icon-only - and MapLibre validates the style strictly: a
+      // `glyphs` property that is present but undefined fails validation with
+      // "string expected, undefined found", the style never finishes loading,
+      // the map's `load` event never fires, and nothing is ever drawn. Omitting
+      // the key is not the same as setting it to undefined.
       sources: {},
-      layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#05080f' } }]
+      layers: [{ id: 'background', type: 'background', paint: { 'background-color': themeHex('map-backdrop') } }]
     }),
     []
   );
@@ -158,45 +162,88 @@ export function MapView({
     const map = mapRef.current;
     if (!map || !ready || !bundle) return;
 
+    // The style's background sits underneath every source layer.
+    if (map.getLayer('background')) {
+      map.setPaintProperty('background', 'background-color', themeHex('map-backdrop'));
+    }
+
     const addSource = (id: string, data: GeoJSON.FeatureCollection) => {
       if (map.getSource(id)) (map.getSource(id) as maplibregl.GeoJSONSource).setData(data);
       else map.addSource(id, { type: 'geojson', data });
     };
     const addLayer = (layer: maplibregl.LayerSpecification) => {
-      if (!map.getLayer(layer.id)) map.addLayer(layer);
+      if (!map.getLayer(layer.id)) {
+        map.addLayer(layer);
+        return;
+      }
+      // Already present: repaint it. This is what makes a theme change take
+      // effect without recreating the map and losing the current view.
+      const paint = (layer as { paint?: Record<string, unknown> }).paint;
+      if (paint) {
+        for (const [property, value] of Object.entries(paint)) {
+          map.setPaintProperty(layer.id, property, value as never);
+        }
+      }
     };
 
-    // Depth raster, drawn as small squares.
-    if (bathymetry?.cells?.length) {
-      const size = bathymetry.cell_size_m;
-      const features: GeoJSON.Feature[] = bathymetry.cells.map(([lon, lat, depth]) => {
-        const dLat = size / 2 / 111320;
-        const dLon = size / 2 / (111320 * Math.cos((lat * Math.PI) / 180));
-        return {
-          type: 'Feature',
-          properties: { depth },
-          geometry: {
-            type: 'Polygon',
-            coordinates: [
-              [
-                [lon - dLon, lat - dLat],
-                [lon + dLon, lat - dLat],
-                [lon + dLon, lat + dLat],
-                [lon - dLon, lat + dLat],
-                [lon - dLon, lat - dLat]
+    // Seabed, as one shaded raster rather than a polygon per cell. See
+    // bathymetryRaster.ts for why.
+    const seabed = buildBathymetryImage(bathymetry);
+    if (seabed) {
+      const existing = map.getSource('bathymetry-raster') as maplibregl.ImageSource | undefined;
+      if (existing) {
+        existing.updateImage({ url: seabed.url, coordinates: seabed.coordinates });
+      } else {
+        map.addSource('bathymetry-raster', {
+          type: 'image',
+          url: seabed.url,
+          coordinates: seabed.coordinates
+        });
+      }
+      const [[west, north], , [east, south]] = seabed.coordinates;
+      addSource('survey-extent', {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [west, north],
+                [east, north],
+                [east, south],
+                [west, south],
+                [west, north]
               ]
-            ]
+            }
           }
-        };
+        ]
       });
-      addSource('bathymetry', { type: 'FeatureCollection', features });
       addLayer({
         id: 'bathymetry-fill',
-        type: 'fill',
-        source: 'bathymetry',
+        type: 'raster',
+        source: 'bathymetry-raster',
         paint: {
-          'fill-color': ['interpolate', ['linear'], ['get', 'depth'], ...DEPTH_RAMP.flat()] as never,
-          'fill-opacity': 0.85
+          'raster-opacity': 0.92,
+          // Smooth interpolation is the whole point: it turns a coarse grid
+          // into a continuous surface instead of visible cell edges.
+          'raster-resampling': 'linear',
+          'raster-fade-duration': 0
+        }
+      });
+    }
+
+    if (map.getSource('survey-extent')) {
+      addLayer({
+        id: 'survey-extent-line',
+        type: 'line',
+        source: 'survey-extent',
+        paint: {
+          'line-color': themeHex('map-land-edge'),
+          'line-width': 1,
+          'line-opacity': 0.35,
+          'line-dasharray': [2, 3]
         }
       });
     }
@@ -206,7 +253,13 @@ export function MapView({
       id: 'contours-line',
       type: 'line',
       source: 'contours',
-      paint: { 'line-color': '#3b5178', 'line-width': 0.7, 'line-opacity': 0.7 }
+      paint: {
+        'line-color': themeHex('map-land-edge'),
+        // Every 10 m contour is drawn heavier, so the eye picks out the major
+        // depth steps before the intermediate ones.
+        'line-width': ['case', ['==', ['%', ['coalesce', ['get', 'depth_m'], 0], 10], 0], 1.3, 0.6] as never,
+        'line-opacity': ['case', ['==', ['%', ['coalesce', ['get', 'depth_m'], 0], 10], 0], 0.65, 0.35] as never
+      }
     });
 
     addSource('channel', (bundle.layers.CHANNEL ?? EMPTY_FC) as GeoJSON.FeatureCollection);
@@ -215,14 +268,14 @@ export function MapView({
       type: 'fill',
       source: 'channel',
       filter: ['==', ['geometry-type'], 'Polygon'],
-      paint: { 'fill-color': '#8ba1c4', 'fill-opacity': 0.08 }
+      paint: { 'fill-color': themeHex('unknown'), 'fill-opacity': 0.08 }
     });
     addLayer({
       id: 'channel-line',
       type: 'line',
       source: 'channel',
       filter: ['==', ['geometry-type'], 'LineString'],
-      paint: { 'line-color': '#5eead4', 'line-width': 2, 'line-dasharray': [3, 2], 'line-opacity': 0.6 }
+      paint: { 'line-color': themeHex('assured-light'), 'line-width': 2, 'line-dasharray': [3, 2], 'line-opacity': 0.6 }
     });
 
     addSource('operating-area', (bundle.layers.OPERATING_AREA ?? EMPTY_FC) as GeoJSON.FeatureCollection);
@@ -230,7 +283,7 @@ export function MapView({
       id: 'operating-area-line',
       type: 'line',
       source: 'operating-area',
-      paint: { 'line-color': '#12b981', 'line-width': 1.6, 'line-dasharray': [4, 3], 'line-opacity': 0.75 }
+      paint: { 'line-color': themeHex('assured'), 'line-width': 1.6, 'line-dasharray': [4, 3], 'line-opacity': 0.75 }
     });
 
     addSource('no-go', (bundle.layers.NO_GO ?? EMPTY_FC) as GeoJSON.FeatureCollection);
@@ -238,27 +291,54 @@ export function MapView({
       id: 'no-go-fill',
       type: 'fill',
       source: 'no-go',
-      paint: { 'fill-color': '#ef3f5b', 'fill-opacity': 0.16 }
+      paint: { 'fill-color': themeHex('critical'), 'fill-opacity': 0.16 }
     });
     addLayer({
       id: 'no-go-line',
       type: 'line',
       source: 'no-go',
-      paint: { 'line-color': '#ef3f5b', 'line-width': 1.2, 'line-opacity': 0.8 }
+      paint: { 'line-color': themeHex('critical'), 'line-width': 1.2, 'line-opacity': 0.8 }
     });
+
+    // Frame the survey area. A fixed zoom left most of the panel empty, because
+    // the demonstration environment is far smaller than the default view.
+    if (!fitted.current && seabed) {
+      const [[west, north], , [east, south]] = seabed.coordinates;
+      map.fitBounds(
+        [
+          [west, south],
+          [east, north]
+        ],
+        { padding: 28, duration: 0, maxZoom: 16 }
+      );
+      fitted.current = true;
+    }
 
     addSource('land', (bundle.layers.LAND ?? EMPTY_FC) as GeoJSON.FeatureCollection);
     addLayer({
       id: 'land-fill',
       type: 'fill',
       source: 'land',
-      paint: { 'fill-color': '#2a3c5e', 'fill-opacity': 0.95 }
+      paint: { 'fill-color': themeHex('map-land'), 'fill-opacity': 1 }
+    });
+    // A soft inner shadow along the coast. Chart convention, and it stops the
+    // shoreline reading as a flat cut-out against the seabed.
+    addLayer({
+      id: 'land-shore-glow',
+      type: 'line',
+      source: 'land',
+      paint: {
+        'line-color': themeHex('map-land-edge'),
+        'line-width': 6,
+        'line-opacity': 0.18,
+        'line-blur': 4
+      }
     });
     addLayer({
       id: 'land-line',
       type: 'line',
       source: 'land',
-      paint: { 'line-color': '#5a739c', 'line-width': 1.1 }
+      paint: { 'line-color': themeHex('map-land-edge'), 'line-width': 1.4 }
     });
 
     addSource('route', (bundle.layers.ROUTE ?? EMPTY_FC) as GeoJSON.FeatureCollection);
@@ -267,7 +347,7 @@ export function MapView({
       type: 'line',
       source: 'route',
       filter: ['==', ['geometry-type'], 'LineString'],
-      paint: { 'line-color': '#8ba1c4', 'line-width': 1.4, 'line-dasharray': [6, 4], 'line-opacity': 0.5 }
+      paint: { 'line-color': themeHex('unknown'), 'line-width': 1.4, 'line-dasharray': [6, 4], 'line-opacity': 0.5 }
     });
     addLayer({
       id: 'route-waypoints',
@@ -276,8 +356,8 @@ export function MapView({
       filter: ['==', ['geometry-type'], 'Point'],
       paint: {
         'circle-radius': 3,
-        'circle-color': '#0a0f1a',
-        'circle-stroke-color': '#8ba1c4',
+        'circle-color': themeHex('map-halo'),
+        'circle-stroke-color': themeHex('unknown'),
         'circle-stroke-width': 1.2
       }
     });
@@ -289,9 +369,9 @@ export function MapView({
       source: 'radar-features',
       paint: {
         'circle-radius': 4,
-        'circle-color': '#38bdf8',
+        'circle-color': themeHex('info'),
         'circle-opacity': 0.75,
-        'circle-stroke-color': '#0a0f1a',
+        'circle-stroke-color': themeHex('map-halo'),
         'circle-stroke-width': 1
       }
     });
@@ -303,9 +383,9 @@ export function MapView({
       source: 'control-points',
       paint: {
         'circle-radius': 4,
-        'circle-color': '#84cc16',
+        'circle-color': themeHex('source-local-ranging'),
         'circle-opacity': 0.9,
-        'circle-stroke-color': '#0a0f1a',
+        'circle-stroke-color': themeHex('map-halo'),
         'circle-stroke-width': 1
       }
     });
@@ -320,7 +400,7 @@ export function MapView({
         .filter(([k]) => !['demonstration_only'].includes(k))
         .map(
           ([k, v]) =>
-            `<div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#8ba1c4">${k.replace(/_/g, ' ')}</span><span style="font-family:monospace">${String(v)}</span></div>`
+            `<div style="display:flex;justify-content:space-between;gap:12px"><span style="color:${themeHex('unknown')}">${k.replace(/_/g, ' ')}</span><span style="font-family:monospace">${String(v)}</span></div>`
         )
         .join('');
       popup
@@ -337,7 +417,7 @@ export function MapView({
         map.getCanvas().style.cursor = '';
       });
     }
-  }, [ready, bundle, bathymetry]);
+  }, [ready, bundle, bathymetry, theme]);
 
   // --- Dynamic layers ------------------------------------------------------
   useEffect(() => {
@@ -371,10 +451,10 @@ export function MapView({
         : EMPTY_FC;
 
     const trailSpecs: Array<[string, keyof typeof trails, string, number, number[] | undefined]> = [
-      ['trail-truth', 'truth', SOURCE_COLOURS.truth, 2, [2, 2]],
-      ['trail-gnss', 'gnss', SOURCE_COLOURS.gnss, 1.6, [1, 2]],
-      ['trail-dr', 'deadReckoning', SOURCE_COLOURS.deadReckoning, 1.4, [4, 3]],
-      ['trail-fused', 'fused', SOURCE_COLOURS.fused, 2.6, undefined]
+      ['trail-truth', 'truth', sourceColours().truth, 2, [2, 2]],
+      ['trail-gnss', 'gnss', sourceColours().gnss, 1.6, [1, 2]],
+      ['trail-dr', 'deadReckoning', sourceColours().deadReckoning, 1.4, [4, 3]],
+      ['trail-fused', 'fused', sourceColours().fused, 2.6, undefined]
     ];
     for (const [id, key, colour, width, dash] of trailSpecs) {
       upsert(id, trailFc(trails[key]), () => ({
@@ -419,7 +499,7 @@ export function MapView({
       type: 'fill',
       source: 'protection',
       filter: ['==', ['get', 'kind'], 'hpl'],
-      paint: { 'fill-color': '#f0b429', 'fill-opacity': 0.1 }
+      paint: { 'fill-color': themeHex('caution'), 'fill-opacity': 0.1 }
     }));
     if (!map.getLayer('protection-hpl-line')) {
       map.addLayer({
@@ -427,7 +507,7 @@ export function MapView({
         type: 'line',
         source: 'protection',
         filter: ['==', ['get', 'kind'], 'hpl'],
-        paint: { 'line-color': '#f0b429', 'line-width': 1.5 }
+        paint: { 'line-color': themeHex('caution'), 'line-width': 1.5 }
       });
     }
     if (!map.getLayer('protection-limit-line')) {
@@ -436,7 +516,7 @@ export function MapView({
         type: 'line',
         source: 'protection',
         filter: ['==', ['get', 'kind'], 'limit'],
-        paint: { 'line-color': '#12b981', 'line-width': 1.2, 'line-dasharray': [2, 2], 'line-opacity': 0.9 }
+        paint: { 'line-color': themeHex('assured'), 'line-width': 1.2, 'line-dasharray': [2, 2], 'line-opacity': 0.9 }
       });
     }
 
@@ -463,13 +543,13 @@ export function MapView({
       id: 'ellipse-line',
       type: 'line',
       source: 'ellipse',
-      paint: { 'line-color': '#38bdf8', 'line-width': 1.4, 'line-dasharray': [3, 2] }
+      paint: { 'line-color': themeHex('info'), 'line-width': 1.4, 'line-dasharray': [3, 2] }
     }));
 
     // --- Position markers ---------------------------------------------------
     const markerFeatures: GeoJSON.Feature[] = [];
     const addMarker = (
-      key: keyof typeof SOURCE_COLOURS,
+      key: SourceKey,
       lat: number | null | undefined,
       lon: number | null | undefined,
       extra: Record<string, unknown> = {}
@@ -477,7 +557,7 @@ export function MapView({
       if (lat === null || lat === undefined || lon === null || lon === undefined) return;
       markerFeatures.push({
         type: 'Feature',
-        properties: { source: key, label: SOURCE_LABELS[key], colour: SOURCE_COLOURS[key], ...extra },
+        properties: { source: key, label: SOURCE_LABELS[key], colour: sourceColours()[key], ...extra },
         geometry: { type: 'Point', coordinates: [lon, lat] }
       });
     };
@@ -537,9 +617,9 @@ export function MapView({
       source: 'bathy-candidates',
       paint: {
         'circle-radius': 4,
-        'circle-color': '#22d3ee',
+        'circle-color': themeHex('source-bathymetric'),
         'circle-opacity': 0.25,
-        'circle-stroke-color': '#22d3ee',
+        'circle-stroke-color': themeHex('source-bathymetric'),
         'circle-stroke-width': 1
       }
     }));
@@ -559,9 +639,9 @@ export function MapView({
       source: 'ais',
       paint: {
         'circle-radius': 4,
-        'circle-color': '#8ba1c4',
+        'circle-color': themeHex('unknown'),
         'circle-opacity': 0.35,
-        'circle-stroke-color': '#8ba1c4',
+        'circle-stroke-color': themeHex('unknown'),
         'circle-stroke-width': 1
       }
     }));
@@ -584,11 +664,12 @@ export function MapView({
       type: 'circle',
       source: 'vessel',
       paint: {
-        'circle-radius': 11,
-        'circle-color': SOURCE_COLOURS.fused,
-        'circle-opacity': 0.18,
-        'circle-stroke-color': SOURCE_COLOURS.fused,
-        'circle-stroke-width': 2
+        'circle-radius': 15,
+        'circle-color': sourceColours().fused,
+        'circle-opacity': 0.14,
+        'circle-stroke-color': sourceColours().fused,
+        'circle-stroke-width': 1.5,
+        'circle-stroke-opacity': 0.55
       }
     }));
     if (!map.getLayer('vessel-heading')) {
@@ -605,32 +686,61 @@ export function MapView({
         }
       });
     }
-  }, [ready, navigation, trails]);
+  }, [ready, navigation, trails, theme]);
 
   // --- Vessel icon ---------------------------------------------------------
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || map.hasImage('vessel-arrow')) return;
-    const size = 32;
+    if (!map || !ready) return;
+    if (map.hasImage('vessel-arrow')) map.removeImage('vessel-arrow');
+    const size = 64;
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.translate(size / 2, size / 2);
-    ctx.beginPath();
-    ctx.moveTo(0, -13);
-    ctx.lineTo(8, 11);
-    ctx.lineTo(0, 6);
-    ctx.lineTo(-8, 11);
-    ctx.closePath();
-    ctx.fillStyle = SOURCE_COLOURS.fused;
+
+    // Hull silhouette: pointed bow, parallel sides, square transom. It reads as
+    // a vessel and its heading at a glance, which a plain triangle does not.
+    const hull = () => {
+      ctx.beginPath();
+      ctx.moveTo(0, -26);
+      ctx.bezierCurveTo(7, -18, 10, -6, 10, 6);
+      ctx.lineTo(10, 20);
+      ctx.lineTo(-10, 20);
+      ctx.lineTo(-10, 6);
+      ctx.bezierCurveTo(-10, -6, -7, -18, 0, -26);
+      ctx.closePath();
+    };
+
+    // Dark outline first, so the marker stays visible over pale seabed as well
+    // as dark - it must never disappear into the chart.
+    hull();
+    ctx.strokeStyle = themeHex('map-ground');
+    ctx.lineWidth = 5;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    hull();
+    ctx.fillStyle = sourceColours().fused;
     ctx.fill();
-    ctx.strokeStyle = '#05080f';
+    ctx.strokeStyle = themeHex('map-halo');
     ctx.lineWidth = 1.5;
     ctx.stroke();
+
+    // Centreline, to make the heading unambiguous at small sizes.
+    ctx.beginPath();
+    ctx.moveTo(0, -18);
+    ctx.lineTo(0, 14);
+    ctx.strokeStyle = themeHex('map-ground');
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
     map.addImage('vessel-arrow', ctx.getImageData(0, 0, size, size), { pixelRatio: 2 });
-  }, [ready]);
+  }, [ready, theme]);
 
   // --- Layer visibility ----------------------------------------------------
   useEffect(() => {
@@ -640,8 +750,10 @@ export function MapView({
       if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
     };
     set('bathymetry-fill', layers.bathymetry);
+    set('survey-extent-line', layers.bathymetry);
     set('contours-line', layers.contours);
     set('land-fill', layers.land);
+    set('land-shore-glow', layers.land);
     set('land-line', layers.land);
     set('operating-area-line', layers.operatingArea);
     set('no-go-fill', layers.noGo);
@@ -715,13 +827,13 @@ export function MapView({
                   ['radar', 'Radar match'],
                   ['bathymetric', 'Bathymetric match'],
                   ['deadReckoning', 'Dead reckoning']
-                ] as Array<[keyof typeof SOURCE_COLOURS, string]>
+                ] as Array<[SourceKey, string]>
               ).map(([key, label]) => (
                 <li key={key} className="flex items-center gap-2">
                   <span
                     aria-hidden
                     className="h-2.5 w-2.5 shrink-0 rounded-full border"
-                    style={{ borderColor: SOURCE_COLOURS[key], backgroundColor: `${SOURCE_COLOURS[key]}55` }}
+                    style={{ borderColor: sourceColours()[key], backgroundColor: `${sourceColours()[key]}55` }}
                   />
                   <span className="text-bridge-300">{label}</span>
                 </li>

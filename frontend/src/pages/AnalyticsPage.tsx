@@ -317,10 +317,10 @@ export function AnalyticsPage() {
                           <p className="panel-title mb-2">Requirement compliance breakdown</p>
                           <BarChart
                             data={[
-                              { label: 'Met', value: s.requirement_met_pct, colour: '#12b981' },
-                              { label: 'At risk', value: s.requirement_at_risk_pct, colour: '#f0b429' },
-                              { label: 'Not met', value: s.requirement_not_met_pct, colour: '#ef3f5b' },
-                              { label: 'Insufficient information', value: s.insufficient_information_pct, colour: '#8ba1c4' }
+                              { label: 'Met', value: s.requirement_met_pct, colour: 'assured' as const },
+                              { label: 'At risk', value: s.requirement_at_risk_pct, colour: 'caution' as const },
+                              { label: 'Not met', value: s.requirement_not_met_pct, colour: 'critical' as const },
+                              { label: 'Insufficient information', value: s.insufficient_information_pct, colour: 'unknown' as const }
                             ]}
                             unit="%"
                             max={100}
@@ -381,7 +381,7 @@ export function AnalyticsPage() {
                             data={points.map((p) => ({ t: p.t, value: p.absolute_sources }))}
                             label="Absolute sources"
                             unit="count"
-                            colour="#12b981"
+                            colour="assured"
                             height={160}
                           />
                         </div>
@@ -391,7 +391,7 @@ export function AnalyticsPage() {
                             data={points.map((p) => ({ t: p.t, value: p.dr_duration_s }))}
                             label="DR duration"
                             unit="s"
-                            colour="#f97316"
+                            colour="chart-series-f"
                             markLineAt={120}
                             markLineLabel="unassisted limit"
                             height={160}
@@ -474,7 +474,7 @@ export function AnalyticsPage() {
                             .map(([id, v]) => ({
                               label: id,
                               value: v.availability_pct,
-                              colour: v.availability_pct > 80 ? '#12b981' : v.availability_pct > 40 ? '#f0b429' : '#ef3f5b'
+                              colour: v.availability_pct > 80 ? 'assured' : v.availability_pct > 40 ? 'caution' : 'critical'
                             }))}
                           unit="%"
                           max={100}

@@ -1,6 +1,6 @@
 # Test plan and results
 
-196 automated tests: 178 backend (Jest), 18 frontend (Vitest + React Testing
+248 automated tests: 185 backend (Jest), 63 frontend (Vitest + React Testing
 Library). Run with `npm test`.
 
 ---
@@ -160,7 +160,7 @@ negative sequence number, unknown top-level fields, a hostile `sensor_id`, and
 declared honestly, every placeholder documents its contract, and the base adapter
 validates before forwarding and counts rejections.
 
-## 7. API integration — `tests/api.test.js` (52 tests)
+## 7. API integration — `tests/api.test.js` (59 tests)
 
 Runs against the real Express app and the real database.
 
@@ -176,7 +176,13 @@ ingestion and validation · CSV replay import, playback and deletion · user
 administration with password policy and duplicate rejection · and the
 database-level proof that the audit log rejects UPDATE and DELETE.
 
-## 8. Frontend — `frontend/tests/ui.test.tsx` (18 tests)
+**Malformed identifiers (7):** a path or query identifier that is not a UUID is
+rejected with 400 on every route that takes one, a well-formed identifier that
+does not exist still returns 404 — the distinction between "that is not an
+identifier" and "there is no such thing" is preserved — and no database error
+text reaches the client.
+
+## 8. Frontend — `frontend/tests/ui.test.tsx` (25 tests)
 
 Section 24 "UI".
 
@@ -201,6 +207,50 @@ distinguishes the trusted position from the raw GNSS position and ground truth.
 
 **Role-based access (2):** a viewer does not see the acknowledge-all control; an
 operator does.
+
+**Map style (1):** the MapLibre style omits the `glyphs` property rather than
+setting it to undefined. MapLibre validates the style strictly and fails the
+whole load on a malformed property; a map that fails to load is silent, so the
+panel simply stays empty with nothing reaching the operator.
+
+**Theme (6):** dark is the default; choosing light sets the document theme and
+`color-scheme`; the choice survives a reload; three options are offered with the
+current one marked by state rather than by highlight colour; the
+follow-the-system setting resolves rather than assuming; every positioning
+source keeps a distinct colour.
+
+## 8a. Seabed raster — `frontend/tests/bathymetryRaster.test.ts` (6 tests)
+
+The depth grid is turned into a shaded image rather than one polygon per cell.
+That conversion is pure geometry, and geometry that is slightly wrong is the
+worst kind — a half-cell offset looks plausible until the channel edge sits a
+cell away from where the vessel actually is.
+
+The image matches the grid dimensions; it extends half a cell beyond the
+outermost cell centres, so the raster registers with the vector layers drawn
+over it; rows run north to south as an image is drawn; a cell the survey does
+not cover stays transparent rather than being painted as zero depth, which
+would read as a shoal; the colour ramp spans the surveyed depth range rather
+than a fixed scale; and a grid that cannot be rasterised is declined instead of
+half-drawn.
+
+## 8b. Palette — `frontend/tests/palette.test.ts` (32 tests)
+
+The two palettes are read straight out of the stylesheet and measured, because a
+theme is easy to break by eye: a colour that looks right on a developer's
+monitor can be unreadable on a bridge in daylight.
+
+Per theme: every token the other theme defines is present; each of the ten text
+and status colours clears WCAG AA at 4.5:1 against **both** surfaces text is set
+on (the panel and the app ground behind it); every positioning-source colour
+clears the 3:1 graphical threshold; each source has its own colour; the status
+colours stay separable; and the ground ramp runs the right way — `bridge-950` is
+the furthest-back ground and `bridge-100` the strongest text in both, which is
+the invariant that lets one set of class names serve both themes.
+
+Across themes: dark remains the `:root` default, so a client opening the page
+with no stored preference gets the bridge palette rather than a white flash, and
+a light palette is declared for the document to select.
 
 ---
 
@@ -230,6 +280,8 @@ because the fixes are the substance of the work.
 | 17 | The alarm that says *why* GNSS was excluded was suppressed when the residual monitor happened to exclude it a fraction earlier | The classification alarm follows the trust engine's own transition, not the exclusion flag |
 | 18 | The API test suite silently skipped itself and passed, because `describe` blocks evaluate before `beforeAll` | Probe the database at module scope with top-level await |
 | 19 | The recorder's scheduled flush and its explicit one could overlap, so `stop()` returned while earlier inserts were still in flight. The performance report is generated the instant a scenario ends, so it was computed from part of the run — silently, and differently each time. It was caught by one scenario's report disagreeing with the rows it had supposedly just read | Serialise flushes through a promise chain, so awaiting a flush also awaits every flush queued before it. `stop()` now means the run is durable |
+| 20 | The map never rendered. The style set `glyphs: undefined`, and MapLibre treats a present-but-undefined property as invalid: style validation failed, the `load` event never fired, and every layer effect bailed out on `ready === false`. Nothing appeared in the console the operator would see and no error state was shown — the map panel was simply empty | Omit the key entirely. A test asserts the style has no `glyphs` own-property |
+| 21 | A path or query identifier that was not a UUID reached PostgreSQL, which rejected it with `22P02`. That surfaced as HTTP 500 with a logged SQL error, reporting a server fault for a caller's typo | Validate UUID parameters at the route boundary with a shared `uuidParams` middleware, and map `22P02` to 400 in the error handler as a safety net |
 
 ---
 
@@ -280,8 +332,8 @@ everywhere.
 
 ```bash
 npm test                      # everything
-npm run test:backend          # 178 backend tests
-npm run test:frontend         # 18 frontend tests
+npm run test:backend          # 185 backend tests
+npm run test:frontend         # 63 frontend tests
 
 # One suite
 npm run test --workspace backend -- tests/integrity.test.js

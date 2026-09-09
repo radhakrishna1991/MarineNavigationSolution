@@ -10,6 +10,7 @@ import { useAppDispatch, useAppSelector } from '../store';
 import { useLoginMutation, errorMessage } from '../api/api';
 import { expiryAcknowledged, loggedIn } from '../store/authSlice';
 import { Field } from '../components/ui';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 export function LoginPage() {
   const dispatch = useAppDispatch();
@@ -176,9 +177,12 @@ export function LoginPage() {
           </div>
         </div>
 
-        <p className="mt-4 text-center text-2xs text-bridge-600">
-          Demonstration geospatial data — not for navigation.
-        </p>
+        <div className="mt-4 flex flex-col items-center gap-3">
+          <ThemeToggle />
+          <p className="text-center text-2xs text-bridge-600">
+            Demonstration geospatial data — not for navigation.
+          </p>
+        </div>
       </div>
     </div>
   );

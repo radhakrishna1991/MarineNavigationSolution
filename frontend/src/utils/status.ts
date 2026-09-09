@@ -285,16 +285,13 @@ export function sensorTone(excluded: boolean, online: boolean, faults: string[])
 }
 
 /** Map colours used for the different position sources. */
-export const SOURCE_COLOURS = {
-  fused: '#12b981',
-  truth: '#f0b429',
-  gnss: '#ef3f5b',
-  radar: '#38bdf8',
-  lidar: '#a78bfa',
-  bathymetric: '#22d3ee',
-  deadReckoning: '#f97316',
-  localRanging: '#84cc16'
-} as const;
+/**
+ * Source identity colours now come from the theme, because they differ between
+ * the dark and light palettes: the same amber that reads well on a dark ground
+ * is illegible on white. `sourceColours()` returns the set for whichever theme
+ * is in force; the identity - which colour means which source - does not change.
+ */
+export { sourceColours, type SourceKey } from '../theme/theme';
 
 export const SOURCE_LABELS = {
   fused: 'Trusted fused position',

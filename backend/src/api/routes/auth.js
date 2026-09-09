@@ -4,7 +4,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authService, publicUser } from '../../services/authService.js';
 import { one } from '../../db/pool.js';
-import { asyncHandler, requireAuth, requireRole, validate, authLimiter, audit, q } from '../../middleware/index.js';
+import { asyncHandler, requireAuth, requireRole, validate, uuidParams, authLimiter, audit, q } from '../../middleware/index.js';
 import { Role } from '../../models/enums.js';
 
 const router = Router();
@@ -113,6 +113,7 @@ router.post(
 router.put(
   '/users/:id',
   requireAuth,
+  uuidParams('id'),
   requireRole(Role.ADMINISTRATOR),
   validate(UpdateUserSchema),
   audit('USER_UPDATE', 'user'),
@@ -124,6 +125,7 @@ router.put(
 router.delete(
   '/users/:id',
   requireAuth,
+  uuidParams('id'),
   requireRole(Role.ADMINISTRATOR),
   audit('USER_DELETE', 'user'),
   asyncHandler(async (req, res) => {

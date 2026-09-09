@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" class="dark" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -20,6 +20,38 @@
     />
   </head>
   <body class="bg-bridge-950 text-bridge-100 antialiased">
+    <script>
+      /*
+       * Apply the stored theme before first paint.
+       *
+       * Without this the document renders in the dark default and then repaints
+       * into light a frame later - a white flash on every load for anyone who
+       * has chosen the light palette. Deliberately inline and synchronous: it
+       * has to run before the body is painted, and it must never throw, because
+       * a private window with storage blocked would otherwise take the whole
+       * application down before the bundle loads.
+       */
+      (function () {
+        try {
+          var prefs = JSON.parse(localStorage.getItem('amnp.preferences') || '{}');
+          var pref = prefs.theme === 'light' || prefs.theme === 'system' ? prefs.theme : 'dark';
+          var resolved =
+            pref === 'system'
+              ? window.matchMedia('(prefers-color-scheme: light)').matches
+                ? 'light'
+                : 'dark'
+              : pref;
+          var root = document.documentElement;
+          root.dataset.theme = resolved;
+          root.classList.toggle('dark', resolved === 'dark');
+          root.style.colorScheme = resolved;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', resolved === 'dark' ? '#05080f' : '#eef2f7');
+        } catch (e) {
+          /* Storage unavailable - the dark default already applied is correct. */
+        }
+      })();
+    </script>
     <div id="root"></div>
     <noscript>
       <div style="padding: 2rem; font-family: system-ui; color: #dde6f2; background: #0a0f1a">

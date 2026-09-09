@@ -111,6 +111,21 @@ export function validate(schema, section = 'body') {
   };
 }
 
+/**
+ * Require the named path parameters to be UUIDs.
+ *
+ * Without this an identifier like `none` reaches PostgreSQL, which rejects it
+ * with `22P02 invalid input syntax for type uuid`. That surfaced as a 500 and a
+ * logged SQL error for what is simply a malformed request - the caller should
+ * be told their identifier is wrong, not that the server broke.
+ */
+export function uuidParams(...names) {
+  const schema = z.object(
+    Object.fromEntries(names.map((name) => [name, z.string().uuid(`${name} must be a UUID`)]))
+  );
+  return validate(schema, 'params');
+}
+
 /** Access the validated query, falling back to the raw one. */
 export function q(req) {
   return req.validatedQuery ?? req.query;
@@ -247,6 +262,17 @@ export function errorHandler(err, req, res, next) {
     return res.status(409).json({
       error: 'CONFLICT',
       message: 'That record already exists.',
+      correlation_id: correlationId
+    });
+  }
+  if (err.code === '22P02') {
+    // A malformed identifier reached the database - a bad request, not a
+    // server fault. Routes validate their parameters (see `uuidParams`); this
+    // is the safety net so a route that forgets still answers 400 rather than
+    // reporting an internal error for the caller's typo.
+    return res.status(400).json({
+      error: 'INVALID_IDENTIFIER',
+      message: 'An identifier in the request is not a valid UUID.',
       correlation_id: correlationId
     });
   }

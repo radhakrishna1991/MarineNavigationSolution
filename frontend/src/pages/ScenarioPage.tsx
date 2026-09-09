@@ -192,6 +192,9 @@ function TransportControls() {
           ⟲ Reset
         </button>
         <div className="mx-1 h-6 w-px bg-bridge-700" />
+        <span className="self-center text-2xs font-semibold uppercase tracking-[0.1em] text-bridge-400">
+          Step
+        </span>
         {[1, 5, 10, 30].map((s) => (
           <button
             key={s}

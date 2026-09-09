@@ -114,7 +114,7 @@ function SensorDetailModal({ sensorId, onClose }: { sensorId: string | null; onC
                     data={residuals.map((r) => ({ t: r.sim_time_s, value: r.normalized_residual }))}
                     label="Normalized residual"
                     unit="σ"
-                    colour="#38bdf8"
+                    colour="chart-series-a"
                     markLineAt={3}
                     markLineLabel="warn 3σ"
                     height={180}

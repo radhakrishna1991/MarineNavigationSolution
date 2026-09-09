@@ -621,3 +621,47 @@ describeIfDb('audit trail is append-only', () => {
     );
   });
 });
+
+/**
+ * Malformed identifiers.
+ *
+ * A path or query identifier that is not a UUID used to reach PostgreSQL,
+ * which rejected it with `22P02 invalid input syntax for type uuid`. That
+ * surfaced as HTTP 500 and a logged SQL error for what is only a badly formed
+ * request - it reported a server fault for a caller's typo, and it put database
+ * error text into the log for anything an unauthenticated-adjacent caller could
+ * send.
+ */
+describeIfDb('malformed identifiers', () => {
+  const cases = [
+    ['get', '/api/performance/summary?runId=not-a-uuid'],
+    ['get', '/api/performance/tracks?runId=not-a-uuid'],
+    ['post', '/api/replay/not-a-uuid/start'],
+    ['post', '/api/alarms/not-a-uuid/acknowledge'],
+    ['delete', '/api/replay/not-a-uuid']
+  ];
+
+  it.each(cases)('rejects %s %s with 400 rather than 500', async (method, path) => {
+    const response = await request(app)[method](path).set('Authorization', `Bearer ${adminToken}`).send({});
+    expect(response.status).toBe(400);
+    expect(response.status).not.toBe(500);
+  });
+
+  it('still returns 404 for a well-formed identifier that does not exist', async () => {
+    // The distinction matters: 400 means "that is not an identifier", 404 means
+    // "that is an identifier, and there is no such thing".
+    const response = await request(app)
+      .post('/api/alarms/00000000-0000-0000-0000-000000000000/acknowledge')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({});
+    expect(response.status).toBe(404);
+  });
+
+  it('does not leak database error text to the client', async () => {
+    const response = await request(app)
+      .post('/api/replay/not-a-uuid/start')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({});
+    expect(JSON.stringify(response.body)).not.toMatch(/invalid input syntax|22P02|SELECT|replay_sessions/i);
+  });
+});

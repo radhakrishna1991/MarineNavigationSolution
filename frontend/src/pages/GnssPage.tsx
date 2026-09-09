@@ -357,7 +357,7 @@ export function GnssPage() {
             data={differenceHistory}
             label="GNSS minus radar"
             unit="m"
-            colour="#ef3f5b"
+            colour="critical"
             markLineAt={thresholds.radar_disagreement_m}
             markLineLabel={`${thresholds.radar_disagreement_m} m threshold`}
           />

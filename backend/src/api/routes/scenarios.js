@@ -7,7 +7,7 @@ import { alarmService } from '../../services/alarmService.js';
 import { FAULT_TYPES } from '../../simulation/faults.js';
 import { getConfig } from '../../config/index.js';
 import { AlarmSeverity, Role } from '../../models/enums.js';
-import { asyncHandler, requireAuth, requireRole, validate, audit, q } from '../../middleware/index.js';
+import { asyncHandler, requireAuth, requireRole, validate, uuidParams, audit, q } from '../../middleware/index.js';
 
 const router = Router();
 
@@ -235,6 +235,7 @@ router.get(
 router.post(
   '/alarms/:alarmId/acknowledge',
   requireAuth,
+  uuidParams('alarmId'),
   requireRole(Role.OPERATOR),
   audit('ALARM_ACKNOWLEDGE', 'alarm'),
   asyncHandler(async (req, res) => {
