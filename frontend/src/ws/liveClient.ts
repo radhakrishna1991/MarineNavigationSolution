@@ -17,9 +17,11 @@ import {
   scenarioStateReceived
 } from '../store/liveSlice';
 
+// Same origin and same virtual path as the dashboard, so an IIS application at
+// `/MNS` upgrades at `/MNS/ws/live` with nothing further to configure.
 const WS_URL =
   import.meta.env.VITE_WS_URL ??
-  `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/live`;
+  `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}${import.meta.env.BASE_URL.replace(/\/$/, '')}/ws/live`;
 
 const BASE_DELAY_MS = 750;
 const MAX_DELAY_MS = 20000;

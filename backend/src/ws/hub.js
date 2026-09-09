@@ -57,7 +57,22 @@ export class LiveHub {
    */
   attach(server, { onIngest = null, path = '/ws/live' } = {}) {
     this.onIngest = onIngest;
-    this.wss = new WebSocketServer({ server, path, maxPayload: env.maxRequestBodyBytes });
+
+    // The upgrade is routed here rather than by passing `path` to the server,
+    // because behind an IIS application alias the pathname arrives as
+    // `/MNS/ws/live`. Matching the tail accepts that without the deployment
+    // having to tell the hub its own mount point, and an upgrade to anything
+    // else is refused rather than left hanging.
+    this.wss = new WebSocketServer({ noServer: true, maxPayload: env.maxRequestBodyBytes });
+
+    server.on('upgrade', (request, socket, head) => {
+      const { pathname } = new URL(request.url, 'http://localhost');
+      if (pathname !== path && !pathname.endsWith(path)) {
+        socket.destroy();
+        return;
+      }
+      this.wss.handleUpgrade(request, socket, head, (ws) => this.wss.emit('connection', ws, request));
+    });
 
     this.wss.on('connection', (socket, request) => this.handleConnection(socket, request));
 

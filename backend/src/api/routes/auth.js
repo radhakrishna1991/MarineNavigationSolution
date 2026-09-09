@@ -4,7 +4,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authService, publicUser } from '../../services/authService.js';
 import { one } from '../../db/pool.js';
-import { asyncHandler, requireAuth, requireRole, validate, uuidParams, authLimiter, audit, q } from '../../middleware/index.js';
+import { asyncHandler, requireAuth, requireRole, validate, uuidParams, authLimiter, audit, q, clientIp } from '../../middleware/index.js';
 import { Role } from '../../models/enums.js';
 
 const router = Router();
@@ -48,7 +48,7 @@ router.post(
   validate(LoginSchema),
   asyncHandler(async (req, res) => {
     const result = await authService.login(req.body.username, req.body.password, {
-      ip: req.ip,
+      ip: clientIp(req),
       userAgent: req.headers['user-agent']
     });
     res.json(result);

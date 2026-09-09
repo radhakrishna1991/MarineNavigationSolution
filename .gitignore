@@ -12,3 +12,9 @@ data/generated/
 Thumbs.db
 .vite/
 *.tsbuildinfo
+
+# IIS deployment build outputs. deploy/iis/ holds the sources (web.config,
+# app.js); the assembled payload and its zip are rebuilt, not tracked.
+deploy/_staging/
+deploy/package/
+deploy/*.zip

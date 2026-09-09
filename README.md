@@ -47,6 +47,22 @@ docker compose up --build
 
 Dashboard on <http://localhost:8080>. Migrations and seeding run automatically.
 
+### Windows Server / IIS
+
+Served by IIS as an application under Default Web Site, with the backend run by
+iisnode. One-time server setup, then every deploy is:
+
+```powershell
+$env:VITE_BASE_PATH = '/MNS'; npm run build --workspace frontend; Remove-Item Env:\VITE_BASE_PATH
+C:\Windows\System32\inetsrv\appcmd.exe stop apppool /apppool.name:MNS
+robocopy frontend\dist C:\inetpub\wwwroot\MNS\public      /MIR /XF *.map
+robocopy backend\src   C:\inetpub\wwwroot\MNS\backend\src /MIR
+C:\Windows\System32\inetsrv\appcmd.exe start apppool /apppool.name:MNS
+```
+
+Dashboard on <http://localhost/MNS/>. Full setup:
+[docs/deployment-iis.md](docs/deployment-iis.md).
+
 ### Local development
 
 **Prerequisites:** Node.js ≥ 20 (24 recommended), PostgreSQL ≥ 14 (17
@@ -92,7 +108,8 @@ placeholders only.
 | `PGHOST` `PGPORT` `PGDATABASE` `PGUSER` `PGPASSWORD` `PGSSL` | Database connection |
 | `JWT_SECRET` `JWT_EXPIRES_IN` `JWT_ISSUER` | Session signing |
 | `SEED_ADMIN_PASSWORD` `SEED_DEMO_PASSWORD` | Bootstrap accounts, used only by `db:seed` |
-| `BACKEND_PORT` `BACKEND_HOST` `CORS_ORIGINS` | HTTP and WebSocket surface |
+| `BACKEND_PORT` `BACKEND_HOST` `CORS_ORIGINS` | HTTP and WebSocket surface. The first two are ignored under iisnode, where IIS owns the listening socket |
+| `APP_BASE_PATH` | Virtual path the platform is served from when it does not own the root of its origin, e.g. `/MNS` for an IIS application. Empty in development and under Docker |
 | `RATE_LIMIT_*` `MAX_REQUEST_BODY_BYTES` | Request limits |
 | `UDP_INGEST_*` | Simulated UDP sensor listener, loopback-bound by default |
 | `RECORD_SENSOR_MESSAGES` `RECORDER_*` | Recording volume and batching |
@@ -274,6 +291,7 @@ instead of the lying one — are documented with their fixes in
 | [docs/how-it-works.md](docs/how-it-works.md) | How the position is actually worked out, and what happens when GNSS or radar fails — plain language, for a non-specialist audience |
 | [docs/scenarios.md](docs/scenarios.md) | What each of the fifteen scenarios does, in plain language — written to be handed to an operator or a customer |
 | [docs/demo-script.md](docs/demo-script.md) | Running the Safeen demonstration |
+| [docs/deployment-iis.md](docs/deployment-iis.md) | Deploying to IIS with iisnode as an application under Default Web Site |
 | [docs/roadmap.md](docs/roadmap.md) | Phases 1–6, with exit criteria and how it could fail |
 | [docs/acceptance.md](docs/acceptance.md) | The 20 acceptance criteria, each with its evidence |
 

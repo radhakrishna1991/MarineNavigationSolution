@@ -10,7 +10,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
-import { env, getConfig } from './config/index.js';
+import { env, getConfig, stripBasePath } from './config/index.js';
 import {
   attachUser,
   ensureActiveUser,
@@ -39,6 +39,19 @@ export function createApp() {
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
 
+  // Mounted as an IIS application the alias is still on the path when the
+  // request reaches Node: `/MNS/api/health` rather than `/api/health`. Strip it
+  // once, here, rather than threading a prefix through every router - the
+  // routes then read the same whether the platform owns its origin or not.
+  // `req.originalUrl` keeps the full path, so the access log still shows what
+  // the browser actually asked for.
+  if (env.basePath) {
+    app.use((req, res, next) => {
+      req.url = stripBasePath(req.url);
+      return next();
+    });
+  }
+
   app.use(
     helmet({
       // The API serves JSON and the SPA is served separately; a restrictive
@@ -50,18 +63,58 @@ export function createApp() {
   );
   app.use(securityHeaders);
 
+  /**
+   * Is this request's Origin the address the request itself arrived on?
+   *
+   * A browser omits `Origin` on same-origin GETs but sends it on same-origin
+   * POST, PUT and DELETE. So "same-origin needs no entry in the allow-list" is
+   * false in practice: behind a reverse proxy, signing in would be rejected by
+   * an empty list even though the dashboard and the API share one origin.
+   *
+   * Comparing the header against the Host the request came in on settles it
+   * without the deployment having to enumerate every hostname it is reached by
+   * - `localhost`, the machine name and the IP address are all correct here,
+   * and none of them can be forged by a cross-origin caller: a request from
+   * another site carries that site's Origin, which will not match this Host.
+   */
+  const isSameOrigin = (origin, req) => {
+    const host = req.headers.host;
+    if (!host) return false;
+    try {
+      return new URL(origin).host.toLowerCase() === host.toLowerCase();
+    } catch {
+      // A malformed Origin is not same-origin, and must not throw out of here.
+      return false;
+    }
+  };
+
   app.use(
-    cors({
-      origin(origin, callback) {
-        // Same-origin and non-browser clients send no Origin header.
-        if (!origin) return callback(null, true);
-        if (env.corsOrigins.includes(origin)) return callback(null, true);
-        return callback(new Error(`Origin ${origin} is not allowed.`));
-      },
-      credentials: false,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-      maxAge: 600
+    cors((req, callback) => {
+      callback(null, {
+        origin(value, done) {
+          // Non-browser clients - curl, a health probe, the ingest adapters -
+          // send no Origin at all.
+          if (!value) return done(null, true);
+          if (env.corsOrigins.includes(value)) return done(null, true);
+          if (isSameOrigin(value, req)) return done(null, true);
+          // A refused origin is the caller's problem, not a server fault, so it
+          // carries its own status and code. Left as a bare Error it reaches
+          // the error handler with no status, becomes a 500, and the reason is
+          // then withheld as internal detail - the browser is told only that
+          // "an unexpected error occurred", which describes a CORS
+          // misconfiguration about as unhelpfully as possible.
+          return done(
+            Object.assign(new Error(`Origin ${value} is not allowed.`), {
+              status: 403,
+              code: 'CORS_ORIGIN_NOT_ALLOWED'
+            })
+          );
+        },
+        credentials: false,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        maxAge: 600
+      });
     })
   );
 

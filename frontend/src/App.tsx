@@ -109,8 +109,15 @@ export function App() {
 
   return (
     <ErrorBoundary>
-      {/* Opt in to the v7 behaviours now so the upgrade is not a behaviour change. */}
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      {/*
+        Opt in to the v7 behaviours now so the upgrade is not a behaviour change.
+        `basename` is the Vite base path, so routes stay declared from `/` while
+        the dashboard is reachable under an IIS application alias such as /MNS.
+      */}
+      <BrowserRouter
+        basename={import.meta.env.BASE_URL}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <LiveConnection />
         <AppShell>
           <Routes>

@@ -31,7 +31,13 @@ import type {
   User
 } from '../types';
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+/*
+ * Default to the path the dashboard itself is served from, so an IIS
+ * application at `/MNS` calls `/MNS/api/...` without a second setting to keep
+ * in step. `VITE_API_BASE_URL` still overrides it for the rarer case of an API
+ * on a different origin.
+ */
+export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.BASE_URL.replace(/\/$/, '');
 
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: `${API_BASE}/api`,

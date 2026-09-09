@@ -71,6 +71,19 @@ const int = (value, fallback) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+/**
+ * Normalise a mount point to `/alias` (or `''` for the root of an origin).
+ *
+ * Accepts what a person would plausibly type - `MNS`, `/MNS`, `/MNS/` - because
+ * this is set by hand in a deployment environment, and a stray slash silently
+ * breaking every route is a poor way to learn about the convention.
+ */
+const basePathOf = (value) => {
+  const trimmed = String(value ?? '').trim().replace(/\/+$/, '');
+  if (!trimmed || trimmed === '/') return '';
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+};
+
 /** Deployment / secret configuration sourced only from the environment. */
 export const env = Object.freeze({
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -84,7 +97,16 @@ export const env = Object.freeze({
   // is then up and unreachable at the address the documentation gives, which is
   // a confusing way to start. Set BACKEND_HOST explicitly to narrow the bind.
   host: process.env.BACKEND_HOST || '::',
-  corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173')
+  // Virtual path the platform is mounted under - `/MNS` when it is an IIS
+  // application of that alias under Default Web Site. Empty when it owns the
+  // root of its origin, which is the case in development and under Docker.
+  basePath: basePathOf(process.env.APP_BASE_PATH),
+  // `??`, not `||`: an explicitly empty CORS_ORIGINS means "no cross-origin
+  // callers", which is the correct setting behind a reverse proxy. With `||`
+  // that empty value is falsy and silently reinstates the development default,
+  // so a deployment that had locked CORS down would quietly be allowing the
+  // Vite dev server and rejecting itself.
+  corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
@@ -131,6 +153,27 @@ export const env = Object.freeze({
     exports: path.join(repoRoot, 'data', 'exports')
   }
 });
+
+/**
+ * Remove the mount point from a request URL.
+ *
+ * The comparison is case-insensitive because IIS treats application aliases
+ * that way: a request for `/mns/api/health` reaches the `/MNS` application and
+ * must resolve to the same route as `/MNS/api/health`.
+ *
+ * @param {string} url a request URL, path and query
+ * @param {string} [basePath] defaults to the configured mount point
+ * @returns {string} the URL with the mount point removed, unchanged if absent
+ */
+export function stripBasePath(url, basePath = env.basePath) {
+  if (!basePath) return url;
+  const lower = url.toLowerCase();
+  const prefix = basePath.toLowerCase();
+  if (lower === prefix) return '/';
+  if (lower.startsWith(`${prefix}/`)) return url.slice(basePath.length);
+  if (lower.startsWith(`${prefix}?`)) return `/${url.slice(basePath.length)}`;
+  return url;
+}
 
 /** Static YAML documents. */
 const defaults = readYaml('default.yaml');

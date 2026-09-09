@@ -131,15 +131,24 @@ async function start() {
     }
   }
 
-  await new Promise((resolve) => server.listen(env.port, env.host, resolve));
+  // Under iisnode, IIS owns the listening socket and hands the process a named
+  // pipe in PORT. The pipe name is not a number and must be listened on without
+  // a host, so it is detected rather than run through the port parser - which
+  // would silently fall back to 4000 and leave IIS talking to nothing.
+  const pipe = process.env.PORT && !/^\d+$/.test(process.env.PORT) ? process.env.PORT : null;
+  await new Promise((resolve) =>
+    pipe ? server.listen(pipe, resolve) : server.listen(env.port, env.host, resolve)
+  );
 
+  const origin = pipe ? `pipe ${pipe}` : `${env.host}:${env.port}`;
   const cfg = getConfig();
   log.info('platform ready', {
     name: cfg.platform.name,
     version: cfg.platform.version,
     classification: cfg.platform.classification,
-    http: `http://${env.host}:${env.port}`,
-    websocket: `ws://${env.host}:${env.port}/ws/live`,
+    http: pipe ? origin : `http://${origin}`,
+    websocket: pipe ? `${origin} ${env.basePath}/ws/live` : `ws://${origin}${env.basePath}/ws/live`,
+    base_path: env.basePath || '/',
     database: `${env.db.host}:${env.db.port}/${env.db.database}`,
     udp_ingest: udpAdapter ? `${env.udp.bind}:${env.udp.port}` : 'disabled',
     environment: env.nodeEnv

@@ -1,8 +1,18 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+/*
+ * The dashboard is normally served from the root of its origin, but under IIS
+ * it is an application beneath Default Web Site and lives at a virtual path.
+ * `VITE_BASE_PATH=/MNS` at build time rewrites every asset URL to match, and
+ * `import.meta.env.BASE_URL` then carries the same value into the router, the
+ * API client and the WebSocket client - one setting, set in one place.
+ */
+const basePath = `/${(process.env.VITE_BASE_PATH ?? '').trim().replace(/^\/+|\/+$/g, '')}`.replace(/^\/$/, '/');
+
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: basePath === '/' ? '/' : `${basePath}/`,
   plugins: [react()],
   server: {
     port: 5173,

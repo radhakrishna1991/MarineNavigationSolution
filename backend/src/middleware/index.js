@@ -21,6 +21,40 @@ function bearerToken(req) {
 }
 
 /**
+ * The address the request came from, as reliably as the deployment allows.
+ *
+ * `req.ip` is normally enough. Under iisnode it is `undefined`: IIS owns the
+ * listening socket and hands Node a named pipe, so `req.socket.remoteAddress`
+ * is empty and `trust proxy` has no address to resolve a forwarded chain
+ * against. iisnode passes the real client address as `x-iisnode-remote_addr`.
+ *
+ * Two things break without this. Rate limiting keys on the address, so every
+ * caller shares one `undefined` bucket - express-rate-limit reports
+ * ERR_ERL_UNDEFINED_IP_ADDRESS and then counts the whole deployment as a single
+ * client, which means thirty failed sign-ins from anywhere lock out everyone.
+ * And the audit trail records the address of every privileged action, so under
+ * IIS it would record nothing.
+ *
+ * `X-Forwarded-For` is read from the right, matching the `trust proxy` setting
+ * of one hop in `createApp`: with a single proxy in front, the last entry is
+ * the client as that proxy saw it.
+ */
+export function clientIp(req) {
+  if (req.ip) return req.ip;
+
+  const forwarded = String(req.headers['x-forwarded-for'] ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (forwarded.length) return forwarded[forwarded.length - 1];
+
+  const iisnode = req.headers['x-iisnode-remote_addr'];
+  if (iisnode) return String(iisnode).trim();
+
+  return req.socket?.remoteAddress ?? 'unknown';
+}
+
+/**
  * Attach `req.user` when a valid token is present. Does not reject: routes
  * declare their own requirement, so a public route stays public.
  */
@@ -70,7 +104,7 @@ export function requireRole(role) {
         entityType: 'route',
         entityId: `${req.method} ${req.originalUrl}`,
         outcome: 'FAILURE',
-        ip: req.ip,
+        ip: clientIp(req),
         detail: { required_role: role }
       });
       return res.status(403).json({
@@ -131,12 +165,19 @@ export function q(req) {
   return req.validatedQuery ?? req.query;
 }
 
+/**
+ * Every limiter keys on `clientIp` rather than on the `req.ip` default, so that
+ * each caller gets its own bucket under iisnode as well - see `clientIp`.
+ */
+const keyGenerator = (req) => clientIp(req);
+
 /** General API rate limiter. */
 export const apiLimiter = rateLimit({
   windowMs: env.rateLimit.windowMs,
   max: env.rateLimit.max,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator,
   message: { error: 'RATE_LIMITED', message: 'Too many requests. Slow down and try again shortly.' }
 });
 
@@ -146,6 +187,7 @@ export const ingestLimiter = rateLimit({
   max: env.rateLimit.ingestMax,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator,
   message: { error: 'RATE_LIMITED', message: 'Ingestion rate limit exceeded.' }
 });
 
@@ -156,6 +198,7 @@ export const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true,
+  keyGenerator,
   message: {
     error: 'RATE_LIMITED',
     message: 'Too many sign-in attempts from this address. Try again in a few minutes.'
@@ -179,7 +222,7 @@ export function audit(action, entityType = null) {
         entityType,
         entityId: req.params?.id ?? req.params?.scenario_id ?? req.params?.session_id ?? null,
         outcome: res.statusCode < 400 ? 'SUCCESS' : 'FAILURE',
-        ip: req.ip,
+        ip: clientIp(req),
         userAgent: req.headers['user-agent'],
         detail: {
           method: req.method,
