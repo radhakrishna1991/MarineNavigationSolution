@@ -42,9 +42,10 @@ interface UiState {
   demoPanelOpen: boolean;
   reducedMotion: boolean;
   /**
-   * Dark is the default and stays the default: on a bridge at night a light
-   * screen destroys the watchkeeper's dark adaptation. Light is for daylight
-   * operation, briefings and printed screenshots.
+   * Light is the default: most of the time this platform is read in an office,
+   * an operations room or a briefing rather than on a darkened bridge. Dark is
+   * one click away and remains the palette for night watchkeeping, where a
+   * light screen destroys the operator's dark adaptation.
    */
   theme: ThemePreference;
 }
@@ -106,7 +107,7 @@ const initialState: UiState = {
   selectedRunId: null,
   demoPanelOpen: false,
   reducedMotion: stored.reducedMotion ?? false,
-  theme: stored.theme ?? 'dark'
+  theme: stored.theme ?? 'light'
 };
 
 let toastCounter = 0;

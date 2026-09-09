@@ -14,18 +14,125 @@
  * dark theme runs the ramp one way and the light theme the other, so
  * `text-bridge-100` on `bg-bridge-950` is legible either way.
  *
- * Dark remains the default. This is a bridge display: at night a light screen
- * destroys the watchkeeper's dark adaptation, and that is a safety property
- * rather than a preference. Light exists for daylight use, for projectors and
- * for printed screenshots.
+ * Light is the default, and is what an operator gets with no stored
+ * preference. Dark is one click away and remains the palette for a darkened
+ * bridge at night, where a light screen destroys the watchkeeper's dark
+ * adaptation - that is a safety property rather than a preference, so the dark
+ * palette is maintained to the same standard as the light one rather than
+ * being an afterthought.
  *
  * Values are space-separated RGB channels so Tailwind's opacity modifiers
  * (`bg-assured/15`) work against them.
  */
 
 @layer base {
-  /* ---------------------------------------------------------------- dark -- */
+  /* --------------------------------------------------------------- light -- */
+  /* Cool neutrals with a faint blue cast: an instrument panel in daylight,
+     not a document. Panels are white and the app ground sits behind them. */
   :root,
+  [data-theme='light'] {
+    color-scheme: light;
+
+    /* Surfaces. `900` is the panel and the lightest value in the ramp; `950`
+       is the ground behind it. The steps between `850` and `600` are fills and
+       edges, each a little further from white than the last. */
+    --bridge-950: 244 246 250;
+    --bridge-900: 255 255 255;
+    --bridge-850: 248 250 252;
+    --bridge-800: 240 244 249;
+    --bridge-750: 232 237 244;
+    /* Hairline. Panel edges, dividers and table rules all land here, and the
+       weight of this one value is most of what separates an interface that
+       reads as calm from one that reads as boxed-in. */
+    --bridge-700: 224 230 238;
+    /* Control edges - buttons and inputs - which have to stay findable, so
+       this stays materially darker than the hairline. */
+    --bridge-600: 176 190 209;
+    --bridge-500: 100 120 143;
+    --bridge-400: 84 104 129;
+    --bridge-300: 61 80 104;
+    --bridge-200: 37 52 74;
+    --bridge-100: 13 27 44;
+
+    /* Status hues darkened until each clears 4.5:1 against a white panel. The
+       `-dark` step stays vivid: it is the marker fill on the map, where the
+       colour sits on its own ground rather than behind text. */
+    --assured: 4 120 87;
+    --assured-light: 6 95 70;
+    --assured-dark: 16 185 129;
+    --caution: 146 89 12;
+    --caution-light: 124 72 15;
+    --caution-dark: 240 180 41;
+    --alert: 194 65 12;
+    --alert-light: 154 52 18;
+    --alert-dark: 242 104 60;
+    --critical: 190 18 60;
+    --critical-light: 159 18 57;
+    --critical-dark: 239 63 91;
+    --info: 3 105 161;
+    --info-light: 7 89 133;
+    --info-dark: 56 189 248;
+    --unknown: 71 85 105;
+    --unknown-light: 51 65 85;
+    --unknown-dark: 148 163 184;
+
+    /* Surfaces separate by a soft cast shadow rather than an inner highlight.
+       Two close, low-opacity layers read as a sheet lifted off the ground;
+       one hard shadow reads as a border drawn twice. */
+    --panel-alpha: 1;
+    --panel-blur: 0px;
+    --shadow-panel: 0 1px 2px 0 rgb(15 30 50 / 0.04), 0 1px 3px 0 rgb(15 30 50 / 0.06);
+    --shadow-raised: 0 12px 32px -12px rgb(15 30 50 / 0.2), 0 4px 10px -4px rgb(15 30 50 / 0.08);
+    --shadow-glow-critical: 0 0 0 1px rgb(190 18 60 / 0.35), 0 6px 20px -8px rgb(190 18 60 / 0.35);
+    --shadow-glow-assured: 0 0 0 1px rgb(4 120 87 / 0.3), 0 6px 18px -8px rgb(4 120 87 / 0.28);
+
+    /* A 15 % tint of a dark hue on white is already strong; ease it off. */
+    --tint-strength: 0.1;
+    --tint-strength-strong: 0.16;
+
+    --map-ground: 233 240 248;
+    --map-backdrop: 205 224 240;
+    /* Land in buff, as on a paper chart: it separates from water by hue as well
+       as by lightness, which a grey landmass on pale blue does not. */
+    --map-land: 234 224 199;
+    --map-land-edge: 150 133 96;
+    --map-graticule: 150 175 200;
+    --map-halo: 255 255 255;
+    --map-depth-0: 198 228 246;
+    --map-depth-1: 166 210 240;
+    --map-depth-2: 133 190 232;
+    --map-depth-3: 100 168 222;
+    --map-depth-4: 68 143 206;
+    --map-depth-5: 40 115 183;
+    --map-depth-6: 20 88 156;
+
+    --chart-axis: 176 190 209;
+    --chart-text: 84 104 129;
+    --chart-grid: 232 237 244;
+    --chart-tooltip-bg: 255 255 255;
+    --chart-tooltip-border: 224 230 238;
+    --chart-tooltip-text: 13 27 44;
+    --chart-pointer: 100 120 143;
+    --chart-series-a: 2 132 199;
+    --chart-series-b: 4 120 87;
+    --chart-series-c: 180 83 9;
+    --chart-series-d: 109 40 217;
+    --chart-series-e: 14 116 144;
+    --chart-series-f: 194 65 12;
+    --chart-series-g: 77 124 15;
+
+    /* Same identities, darkened until each is legible against a white panel. */
+    --source-fused: 4 120 87;
+    --source-truth: 180 83 9;
+    --source-gnss: 190 18 60;
+    --source-radar: 2 132 199;
+    --source-lidar: 109 40 217;
+    --source-bathymetric: 14 116 144;
+    --source-dead-reckoning: 194 65 12;
+    --source-local-ranging: 77 124 15;
+  }
+
+  /* ---------------------------------------------------------------- dark -- */
   [data-theme='dark'] {
     color-scheme: dark;
 
@@ -115,101 +222,6 @@
     --source-bathymetric: 34 211 238;
     --source-dead-reckoning: 249 115 22;
     --source-local-ranging: 132 204 22;
-  }
-
-  /* --------------------------------------------------------------- light -- */
-  [data-theme='light'] {
-    color-scheme: light;
-
-    /* Cool neutrals with a faint blue cast: an instrument panel in daylight,
-       not a document. Panels are white and the app ground sits behind them. */
-    --bridge-950: 238 242 247;
-    --bridge-900: 255 255 255;
-    --bridge-850: 244 247 251;
-    --bridge-800: 232 238 246;
-    --bridge-750: 221 229 240;
-    --bridge-700: 203 214 228;
-    --bridge-600: 168 184 205;
-    --bridge-500: 100 120 143;
-    --bridge-400: 84 104 129;
-    --bridge-300: 61 80 104;
-    --bridge-200: 37 52 74;
-    --bridge-100: 13 27 44;
-
-    /* Status hues darkened until each clears 4.5:1 against a white panel. The
-       `-dark` step stays vivid: it is the marker fill on the map, where the
-       colour sits on its own ground rather than behind text. */
-    --assured: 4 120 87;
-    --assured-light: 6 95 70;
-    --assured-dark: 16 185 129;
-    --caution: 146 89 12;
-    --caution-light: 124 72 15;
-    --caution-dark: 240 180 41;
-    --alert: 194 65 12;
-    --alert-light: 154 52 18;
-    --alert-dark: 242 104 60;
-    --critical: 190 18 60;
-    --critical-light: 159 18 57;
-    --critical-dark: 239 63 91;
-    --info: 3 105 161;
-    --info-light: 7 89 133;
-    --info-dark: 56 189 248;
-    --unknown: 71 85 105;
-    --unknown-light: 51 65 85;
-    --unknown-dark: 148 163 184;
-
-    /* Surfaces separate by a real cast shadow rather than an inner highlight. */
-    --panel-alpha: 1;
-    --panel-blur: 0px;
-    --shadow-panel: 0 1px 2px 0 rgb(15 30 50 / 0.05), 0 1px 3px -1px rgb(15 30 50 / 0.08);
-    --shadow-raised: 0 10px 30px -10px rgb(15 30 50 / 0.22), 0 2px 6px -2px rgb(15 30 50 / 0.1);
-    --shadow-glow-critical: 0 0 0 1px rgb(190 18 60 / 0.35), 0 6px 20px -8px rgb(190 18 60 / 0.35);
-    --shadow-glow-assured: 0 0 0 1px rgb(4 120 87 / 0.3), 0 6px 18px -8px rgb(4 120 87 / 0.28);
-
-    /* A 15 % tint of a dark hue on white is already strong; ease it off. */
-    --tint-strength: 0.1;
-    --tint-strength-strong: 0.16;
-
-    --map-ground: 233 240 248;
-    --map-backdrop: 205 224 240;
-    /* Land in buff, as on a paper chart: it separates from water by hue as well
-       as by lightness, which a grey landmass on pale blue does not. */
-    --map-land: 234 224 199;
-    --map-land-edge: 150 133 96;
-    --map-graticule: 150 175 200;
-    --map-halo: 255 255 255;
-    --map-depth-0: 198 228 246;
-    --map-depth-1: 166 210 240;
-    --map-depth-2: 133 190 232;
-    --map-depth-3: 100 168 222;
-    --map-depth-4: 68 143 206;
-    --map-depth-5: 40 115 183;
-    --map-depth-6: 20 88 156;
-
-    --chart-axis: 168 184 205;
-    --chart-text: 84 104 129;
-    --chart-grid: 226 232 240;
-    --chart-tooltip-bg: 255 255 255;
-    --chart-tooltip-border: 203 214 228;
-    --chart-tooltip-text: 13 27 44;
-    --chart-pointer: 100 120 143;
-    --chart-series-a: 2 132 199;
-    --chart-series-b: 4 120 87;
-    --chart-series-c: 180 83 9;
-    --chart-series-d: 109 40 217;
-    --chart-series-e: 14 116 144;
-    --chart-series-f: 194 65 12;
-    --chart-series-g: 77 124 15;
-
-    /* Same identities, darkened until each is legible against a white panel. */
-    --source-fused: 4 120 87;
-    --source-truth: 180 83 9;
-    --source-gnss: 190 18 60;
-    --source-radar: 2 132 199;
-    --source-lidar: 109 40 217;
-    --source-bathymetric: 14 116 144;
-    --source-dead-reckoning: 194 65 12;
-    --source-local-ranging: 77 124 15;
   }
 
   * {
@@ -374,12 +386,15 @@
            text-2xs font-semibold uppercase tracking-[0.1em] text-bridge-300;
   }
 
+  /* Row rules and the row hover both key off the hairline rather than a fill
+     tint: on a white panel a 50 % tint of a near-white fill is invisible, and a
+     table whose rows do not separate is unreadable at a glance. */
   .data-table tbody td {
-    @apply border-b border-bridge-800/70 px-3 py-2 align-middle text-bridge-200;
+    @apply border-b border-bridge-700/70 px-3 py-2 align-middle text-bridge-200;
   }
 
   .data-table tbody tr:hover {
-    @apply bg-bridge-800/50;
+    @apply bg-bridge-800;
   }
 
   .chip {
@@ -387,7 +402,7 @@
   }
 
   .kv-row {
-    @apply flex items-baseline justify-between gap-4 border-b border-bridge-800/60 py-1.5 last:border-0;
+    @apply flex items-baseline justify-between gap-4 border-b border-bridge-700/60 py-1.5 last:border-0;
   }
 
   .kv-key {
@@ -420,12 +435,12 @@
 .maplibregl-ctrl-group button:hover {
   @apply !bg-bridge-800;
 }
-/* MapLibre ships black control glyphs; invert them on the dark ground only. */
-.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+/* MapLibre ships black control glyphs, which suit the light ground as they
+   are. Inverting is the exception, so it is stated as one - a document that
+   somehow reached the browser without `data-theme` then still gets legible
+   controls rather than black-on-black. */
+[data-theme='dark'] .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
   filter: invert(1) brightness(1.35);
-}
-[data-theme='light'] .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
-  filter: none;
 }
 .maplibregl-ctrl-attrib {
   @apply !bg-bridge-900/80 !text-bridge-400;

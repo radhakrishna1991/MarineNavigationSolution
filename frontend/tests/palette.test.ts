@@ -130,15 +130,18 @@ describe.each([
 });
 
 describe('theme definitions', () => {
-  it('keeps the dark palette as the default at :root', () => {
+  it('keeps the light palette as the default at :root', () => {
     // A client opening the page with no stored preference, or with JavaScript
-    // still loading, must get the bridge palette rather than a white flash.
-    const rootBlock = css.slice(css.indexOf(':root,'), css.indexOf("[data-theme='light']"));
-    expect(rootBlock).toContain('color-scheme: dark');
+    // still loading, gets the light palette. `:root` and the light block are
+    // one rule so the two can never disagree.
+    const start = css.indexOf(':root,');
+    const rootBlock = css.slice(start, css.indexOf('\n  }', start));
+    expect(rootBlock).toContain("[data-theme='light']");
+    expect(rootBlock).toContain('color-scheme: light');
   });
 
-  it('declares a light palette that the document can select', () => {
-    expect(css).toContain("[data-theme='light']");
-    expect(css).toContain('color-scheme: light');
+  it('declares a dark palette that the document can select', () => {
+    expect(css).toContain("[data-theme='dark']");
+    expect(css).toContain('color-scheme: dark');
   });
 });

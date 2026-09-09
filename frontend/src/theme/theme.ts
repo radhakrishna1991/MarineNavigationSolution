@@ -86,85 +86,92 @@ const SOURCE_TOKEN: Record<SourceKey, SourceToken> = {
 };
 
 /**
- * Dark values, duplicated only as a fallback.
+ * Light values, duplicated only as a fallback.
  *
  * `getComputedStyle` returns nothing for a custom property when the stylesheet
  * has not loaded - during the first paint, in a unit test with CSS disabled, or
  * if the stylesheet failed to fetch. A chart with no colours at all is worse
- * than a chart in the wrong theme, so these stand in. They are the dark values
- * because dark is the default theme.
+ * than a chart in the wrong theme, so these stand in. They are the light values
+ * because light is the default theme; they must be kept in step with the
+ * `:root` block of `index.css`, which is the definition.
  */
 const FALLBACK: Record<string, string> = {
-  'bridge-950': '5 8 15',
-  'bridge-900': '10 15 26',
-  'bridge-850': '14 22 38',
-  'bridge-800': '19 29 49',
-  'bridge-750': '24 36 60',
-  'bridge-700': '30 44 72',
-  'bridge-600': '42 60 94',
-  'bridge-500': '59 81 120',
-  'bridge-400': '106 130 170',
-  'bridge-300': '139 161 196',
-  'bridge-200': '185 201 224',
-  'bridge-100': '221 230 242',
-  assured: '18 185 129',
-  'assured-light': '94 234 212',
-  'assured-dark': '11 127 90',
-  caution: '240 180 41',
-  'caution-light': '253 230 138',
-  'caution-dark': '161 98 7',
-  alert: '242 104 60',
-  'alert-light': '253 186 154',
-  'alert-dark': '180 68 31',
-  critical: '239 63 91',
-  'critical-light': '253 164 180',
-  'critical-dark': '164 18 58',
-  info: '56 189 248',
-  'info-light': '186 230 253',
-  'info-dark': '3 105 161',
-  unknown: '139 161 196',
-  'unknown-light': '203 213 225',
-  'unknown-dark': '71 85 105',
-  'map-ground': '5 8 15',
-  'map-backdrop': '9 26 45',
-  'map-land': '42 60 94',
-  'map-land-edge': '90 115 156',
-  'map-graticule': '59 81 120',
-  'map-halo': '5 8 15',
-  'map-depth-0': '30 58 95',
-  'map-depth-1': '26 77 122',
-  'map-depth-2': '21 97 143',
-  'map-depth-3': '15 111 158',
-  'map-depth-4': '10 127 174',
-  'map-depth-5': '8 145 178',
-  'map-depth-6': '14 116 144',
-  'chart-axis': '59 81 120',
-  'chart-text': '139 161 196',
-  'chart-grid': '24 36 60',
-  'chart-tooltip-bg': '14 22 38',
-  'chart-tooltip-border': '42 60 94',
-  'chart-tooltip-text': '221 230 242',
-  'chart-pointer': '90 115 156',
-  'chart-series-a': '56 189 248',
-  'chart-series-b': '18 185 129',
-  'chart-series-c': '240 180 41',
-  'chart-series-d': '167 139 250',
-  'chart-series-e': '34 211 238',
-  'chart-series-f': '249 115 22',
-  'chart-series-g': '132 204 22',
-  'source-fused': '18 185 129',
-  'source-truth': '240 180 41',
-  'source-gnss': '239 63 91',
-  'source-radar': '56 189 248',
-  'source-lidar': '167 139 250',
-  'source-bathymetric': '34 211 238',
-  'source-dead-reckoning': '249 115 22',
-  'source-local-ranging': '132 204 22'
+  'bridge-950': '244 246 250',
+  'bridge-900': '255 255 255',
+  'bridge-850': '248 250 252',
+  'bridge-800': '240 244 249',
+  'bridge-750': '232 237 244',
+  'bridge-700': '224 230 238',
+  'bridge-600': '176 190 209',
+  'bridge-500': '100 120 143',
+  'bridge-400': '84 104 129',
+  'bridge-300': '61 80 104',
+  'bridge-200': '37 52 74',
+  'bridge-100': '13 27 44',
+  assured: '4 120 87',
+  'assured-light': '6 95 70',
+  'assured-dark': '16 185 129',
+  caution: '146 89 12',
+  'caution-light': '124 72 15',
+  'caution-dark': '240 180 41',
+  alert: '194 65 12',
+  'alert-light': '154 52 18',
+  'alert-dark': '242 104 60',
+  critical: '190 18 60',
+  'critical-light': '159 18 57',
+  'critical-dark': '239 63 91',
+  info: '3 105 161',
+  'info-light': '7 89 133',
+  'info-dark': '56 189 248',
+  unknown: '71 85 105',
+  'unknown-light': '51 65 85',
+  'unknown-dark': '148 163 184',
+  'map-ground': '233 240 248',
+  'map-backdrop': '205 224 240',
+  'map-land': '234 224 199',
+  'map-land-edge': '150 133 96',
+  'map-graticule': '150 175 200',
+  'map-halo': '255 255 255',
+  'map-depth-0': '198 228 246',
+  'map-depth-1': '166 210 240',
+  'map-depth-2': '133 190 232',
+  'map-depth-3': '100 168 222',
+  'map-depth-4': '68 143 206',
+  'map-depth-5': '40 115 183',
+  'map-depth-6': '20 88 156',
+  'chart-axis': '176 190 209',
+  'chart-text': '84 104 129',
+  'chart-grid': '232 237 244',
+  'chart-tooltip-bg': '255 255 255',
+  'chart-tooltip-border': '224 230 238',
+  'chart-tooltip-text': '13 27 44',
+  'chart-pointer': '100 120 143',
+  'chart-series-a': '2 132 199',
+  'chart-series-b': '4 120 87',
+  'chart-series-c': '180 83 9',
+  'chart-series-d': '109 40 217',
+  'chart-series-e': '14 116 144',
+  'chart-series-f': '194 65 12',
+  'chart-series-g': '77 124 15',
+  'source-fused': '4 120 87',
+  'source-truth': '180 83 9',
+  'source-gnss': '190 18 60',
+  'source-radar': '2 132 199',
+  'source-lidar': '109 40 217',
+  'source-bathymetric': '14 116 144',
+  'source-dead-reckoning': '194 65 12',
+  'source-local-ranging': '77 124 15'
 };
 
-/** What the operating system is asking for, when the preference is `system`. */
+/**
+ * What the operating system is asking for, when the preference is `system`.
+ *
+ * The query asks about light specifically, so a browser that reports neither
+ * gets dark - the historical behaviour of `prefers-color-scheme`. Only the case
+ * where the question cannot be asked at all falls back to the app default.
+ */
 export function systemTheme(): ResolvedTheme {
-  if (typeof window === 'undefined' || !window.matchMedia) return 'dark';
+  if (typeof window === 'undefined' || !window.matchMedia) return 'light';
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 
@@ -195,7 +202,9 @@ export function applyTheme(resolved: ResolvedTheme, options: { animate?: boolean
 
   // Keep the browser UI (address bar on mobile, window chrome) in step.
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#05080f' : '#eef2f7');
+  // Kept in step with the same two values in `index.html`, which applies the
+  // theme before this module has loaded.
+  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#05080f' : '#f4f6fa');
 }
 
 /** The raw `R G B` channel triplet for a token. */

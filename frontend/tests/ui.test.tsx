@@ -415,9 +415,10 @@ describe('role-based access in the interface', () => {
 /**
  * Theme (Section 27, "responsive layout" and "colour is not the only indicator").
  *
- * Dark is the operational default and has to stay that way: a light screen on a
- * bridge at night destroys the watchkeeper's dark adaptation. Light exists for
- * daylight work, briefings and printed screenshots.
+ * Light is the default, for the operations room and the briefing. Dark has to
+ * remain one click away and fully maintained: a light screen on a bridge at
+ * night destroys the watchkeeper's dark adaptation, so the choice, its
+ * persistence and its effect on the document are all covered here.
  */
 describe('theme', () => {
   beforeEach(() => {
@@ -436,31 +437,31 @@ describe('theme', () => {
     return <ThemeToggle />;
   }
 
-  it('defaults to the dark bridge palette', () => {
+  it('defaults to the light palette', () => {
     const { store } = renderWithStore(<ThemedApp />);
-    expect(store.getState().ui.theme).toBe('dark');
-    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(store.getState().ui.theme).toBe('light');
+    expect(document.documentElement.dataset.theme).toBe('light');
   });
 
-  it('switches the document to the light palette when light is chosen', async () => {
+  it('switches the document to the dark bridge palette when dark is chosen', async () => {
     const user = userEvent.setup();
     const { store } = renderWithStore(<ThemedApp />);
 
-    await user.click(screen.getByRole('radio', { name: /light/i }));
+    await user.click(screen.getByRole('radio', { name: /dark/i }));
 
-    expect(store.getState().ui.theme).toBe('light');
-    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(store.getState().ui.theme).toBe('dark');
+    expect(document.documentElement.dataset.theme).toBe('dark');
     // `color-scheme` is what makes native scrollbars and form controls follow.
-    expect(document.documentElement.style.colorScheme).toBe('light');
+    expect(document.documentElement.style.colorScheme).toBe('dark');
   });
 
   it('remembers the choice across a reload', async () => {
     const user = userEvent.setup();
     renderWithStore(<ThemedApp />);
-    await user.click(screen.getByRole('radio', { name: /light/i }));
+    await user.click(screen.getByRole('radio', { name: /dark/i }));
 
     const persisted = JSON.parse(localStorage.getItem('amnp.preferences') ?? '{}');
-    expect(persisted.theme).toBe('light');
+    expect(persisted.theme).toBe('dark');
   });
 
   it('offers dark, light and follow-the-system, with the current one marked', async () => {
@@ -470,19 +471,21 @@ describe('theme', () => {
     const options = screen.getAllByRole('radio');
     expect(options).toHaveLength(3);
     // The active option is identified by state, not by colour alone.
-    expect(screen.getByRole('radio', { name: /dark/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /light/i })).toHaveAttribute('aria-checked', 'true');
 
     await user.click(screen.getByRole('radio', { name: /auto/i }));
     expect(screen.getByRole('radio', { name: /auto/i })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('radio', { name: /dark/i })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: /light/i })).toHaveAttribute('aria-checked', 'false');
   });
 
   it('resolves the system preference rather than assuming one', () => {
     expect(resolveTheme('dark')).toBe('dark');
     expect(resolveTheme('light')).toBe('light');
-    // jsdom reports no match for the light query, so system means dark here -
-    // the same fallback the platform uses when it cannot ask.
-    expect(resolveTheme('system')).toBe('dark');
+    // jsdom implements no `matchMedia`, so this exercises the path where the
+    // question cannot be asked at all - which falls back to the application
+    // default rather than leaving the theme undefined. A real browser answers
+    // the query and gets dark or light from the operating system.
+    expect(resolveTheme('system')).toBe('light');
   });
 
   it('keeps a distinct colour per positioning source in both palettes', () => {
