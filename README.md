@@ -218,6 +218,17 @@ trusted position plotted separately from raw GNSS, ground truth and each
 contributing sensor's own fix. The camera frames the survey area on load, and
 the colour ramp spans the surveyed depth range so the shape of the seabed reads
 at a glance in both palettes.
+
+The Fleet, Navigation and Demonstration charts each carry two tabs. **Platform
+chart** is the default and is the one above: drawn entirely from the platform's
+own data, with no external tile server, so it works on an isolated network.
+**Google map** is the same picture — the same layers, legend, toggles and
+per-source colours — over Google's satellite imagery, for demonstrations and
+briefings where recognisable ground makes the situation easier to explain. It
+needs the public internet and a Google Maps JavaScript API key in
+`VITE_GOOGLE_MAPS_API_KEY` (see `frontend/.env.example`); without one the tab
+says so rather than showing a blank chart. Nothing on it feeds any estimator:
+Google supplies pixels underneath the picture and nothing else.
 **Sensors** — every sensor with its decision, reason, residuals and last message.
 **GNSS integrity** — trust score, active conditions, evidence, classification,
 recovery countdown.

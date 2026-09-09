@@ -14,7 +14,7 @@ import { useScenariosQuery, useStartScenarioMutation, useScenarioJumpMutation, e
 import { toastAdded } from '../store/uiSlice';
 import { hasRole } from '../store/authSlice';
 import { EmptyState, KeyValue, Note, Panel, Readout, StatusChip } from '../components/ui';
-import { MapView } from '../map/MapView';
+import { NavigationChartTabs } from '../map/MapTabs';
 import { StatusBanner } from '../components/StatusBanner';
 import { ErrorVsProtectionChart, TrustScoreChart } from '../charts/charts';
 import { metres, number, simClock } from '../utils/format';
@@ -214,7 +214,7 @@ export function DemoPage() {
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-3">
-          <MapView navigation={navigation} className="h-[24rem] xl:h-[30rem]" />
+          <NavigationChartTabs navigation={navigation} className="h-[24rem] xl:h-[30rem]" />
           <Panel title="The claim, and the evidence for it">
             <div className="grid gap-4 lg:grid-cols-2">
               <div>

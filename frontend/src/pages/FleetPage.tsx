@@ -16,7 +16,7 @@ import { useFleetQuery } from '../api/api';
 import { EmptyState, Panel, StatusChip } from '../components/ui';
 import { REQUIREMENT_PRESENTATION, TRUST_PRESENTATION, sourceColours } from '../utils/status';
 import { bearing, duration, latitudeDm, longitudeDm, metres, number, speed as fmtSpeed, EM_DASH } from '../utils/format';
-import { FleetMap } from '../map/FleetMap';
+import { FleetChartTabs } from '../map/MapTabs';
 import type { FleetVessel, RequirementStatus } from '../types';
 
 /**
@@ -293,7 +293,7 @@ export function FleetPage() {
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-3">
           <Panel title="Fleet positions" bodyClassName="p-0">
-            <FleetMap
+            <FleetChartTabs
               vessels={vessels}
               selectedId={selected?.vessel_id ?? null}
               onSelect={setSelectedId}

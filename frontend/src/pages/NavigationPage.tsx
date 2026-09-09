@@ -8,7 +8,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store';
-import { MapView } from '../map/MapView';
+import { NavigationChartTabs } from '../map/MapTabs';
 import { StatusBanner } from '../components/StatusBanner';
 import { KeyValue, Meter, Note, Panel, Readout, StatusChip, EmptyState } from '../components/ui';
 import { Sparkline } from '../charts/charts';
@@ -568,7 +568,7 @@ export function NavigationPage() {
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_23rem]">
         <div className="space-y-3">
-          <MapView navigation={navigation} className="h-[26rem] xl:h-[34rem]" />
+          <NavigationChartTabs navigation={navigation} className="h-[26rem] xl:h-[34rem]" />
           {navigation && mode && (
             <Panel title="Active mode" subtitle={mode.label}>
               <div className="grid gap-4 sm:grid-cols-2">

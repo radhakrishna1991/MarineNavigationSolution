@@ -17,6 +17,7 @@ import { NavigationPage } from '../src/pages/NavigationPage';
 import { SensorsPage } from '../src/pages/SensorsPage';
 import { AlarmsPage } from '../src/pages/AlarmsPage';
 import { MapView } from '../src/map/MapView';
+import { NavigationChartTabs } from '../src/map/MapTabs';
 import { navigationReceived } from '../src/store/liveSlice';
 import { ThemeToggle } from '../src/components/ThemeToggle';
 import { SourceIndicator } from '../src/components/SourceIndicator';
@@ -358,6 +359,37 @@ describe('map', () => {
     expect(screen.getByText('Trusted fused')).toBeInTheDocument();
     expect(screen.getByText('Raw GNSS')).toBeInTheDocument();
     expect(screen.getByText('Ground truth')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Chart tabs.
+ *
+ * The Google chart depends on a public service and a billed key; the platform
+ * chart depends on nothing. The platform chart must therefore be what an
+ * operator gets without choosing, and an unconfigured Google chart must say so
+ * rather than presenting itself as an empty chart.
+ */
+describe('chart tabs', () => {
+  it('opens on the platform chart', () => {
+    renderWithStore(<NavigationChartTabs navigation={makeNavigation()} />, { responses: {} });
+    expect(screen.getByRole('tab', { name: 'Platform chart' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Google map' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByText('Position sources')).toBeInTheDocument();
+  });
+
+  it('explains itself rather than showing a blank chart when no Google key is configured', async () => {
+    // Stubbed rather than assumed: a developer machine may well have a key in
+    // its environment, and this is the no-key path.
+    vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', '');
+    const user = userEvent.setup();
+    renderWithStore(<NavigationChartTabs navigation={makeNavigation()} />, { responses: {} });
+
+    await user.click(screen.getByRole('tab', { name: 'Google map' }));
+
+    expect(await screen.findByText('The Google basemap is not configured')).toBeInTheDocument();
+    expect(screen.getByText('VITE_GOOGLE_MAPS_API_KEY')).toBeInTheDocument();
+    vi.unstubAllEnvs();
   });
 });
 
