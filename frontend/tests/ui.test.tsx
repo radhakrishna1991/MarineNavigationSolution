@@ -19,6 +19,7 @@ import { AlarmsPage } from '../src/pages/AlarmsPage';
 import { MapView } from '../src/map/MapView';
 import { navigationReceived } from '../src/store/liveSlice';
 import { ThemeToggle } from '../src/components/ThemeToggle';
+import { SourceIndicator } from '../src/components/SourceIndicator';
 import { resolveTheme, sourceColours } from '../src/theme/theme';
 import { useApplyTheme } from '../src/theme/useTheme';
 
@@ -111,7 +112,6 @@ describe('navigation screen', () => {
     });
 
     expect(await screen.findByText('Trusted position')).toBeInTheDocument();
-    expect(screen.getByText(/Demonstration geospatial data/i)).toBeInTheDocument();
     expect(screen.getByText('Positioning sources')).toBeInTheDocument();
     expect(screen.getByText(/Radar map matching/)).toBeInTheDocument();
   });
@@ -304,16 +304,53 @@ describe('sensor table', () => {
   });
 });
 
+/**
+ * Data-source indicator.
+ *
+ * An operational display has to say where its data came from. Mistaking a
+ * replay or a simulation for a live feed is how an operator acts on a position
+ * that is not the vessel's current one, so this is derived from what the
+ * platform is actually doing rather than from a build-time flag.
+ */
+describe('data source indicator', () => {
+  it('reports SIMULATION while a scenario is running', () => {
+    const { store } = renderWithStore(<SourceIndicator />);
+    act(() => {
+      store.dispatch({ type: 'live/scenarioStateReceived', payload: { state: 'RUNNING', scenario_id: 'SCN_01_HEALTHY' } });
+    });
+    expect(screen.getByText('SIMULATION')).toBeInTheDocument();
+  });
+
+  it('reports REPLAY while recorded data is being played back', () => {
+    const { store } = renderWithStore(<SourceIndicator />);
+    act(() => {
+      store.dispatch({ type: 'live/replayStateReceived', payload: { state: 'RUNNING', session_id: 'r1' } });
+    });
+    expect(screen.getByText('REPLAY')).toBeInTheDocument();
+  });
+
+  it('reports LIVE when solutions arrive with no scenario or replay running', () => {
+    // Nothing is being simulated or replayed, so the data can only have come
+    // from ingested sensor messages.
+    renderWithStore(<SourceIndicator />, { navigation: makeNavigation() });
+    expect(screen.getByText('LIVE')).toBeInTheDocument();
+  });
+
+  it('reports STANDBY when nothing is feeding the display', () => {
+    renderWithStore(<SourceIndicator />);
+    expect(screen.getByText('STANDBY')).toBeInTheDocument();
+  });
+});
+
 describe('map', () => {
-  it('loads and always shows the demonstration label', async () => {
+  it('loads and shows the position-source legend', async () => {
     renderWithStore(<MapView navigation={makeNavigation()} />, {
       responses: {
         '/geospatial/bundle': { layers: {}, origin: { latitude: 24.51, longitude: 54.35 }, label: 'demo' },
         '/geospatial/bathymetry': { cells: [], min_depth_m: 0, max_depth_m: 20, cell_size_m: 56 }
       }
     });
-    expect(await screen.findByText(/Demonstration geospatial data — not for navigation/i)).toBeInTheDocument();
-    expect(screen.getByText('Position sources')).toBeInTheDocument();
+    expect(await screen.findByText('Position sources')).toBeInTheDocument();
   });
 
   it('distinguishes the trusted position from the raw GNSS position in the legend', () => {

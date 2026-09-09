@@ -665,3 +665,161 @@ describeIfDb('malformed identifiers', () => {
     expect(JSON.stringify(response.body)).not.toMatch(/invalid input syntax|22P02|SELECT|replay_sessions/i);
   });
 });
+
+/**
+ * Vessel management.
+ *
+ * The fleet register is the one place an operator creates data rather than
+ * observing it, so the validation matters as much as the storage. Two rules are
+ * worth more than the rest: a vessel with no absolute positioning source could
+ * never report the requirement as met, and the focused vessel cannot be deleted
+ * because the detail screens, the recorder and fault injection all follow it.
+ */
+describeIfDb('vessel management', () => {
+  const NEW_VESSEL = {
+    id: 'VSL_APITEST',
+    name: 'API Test Vessel',
+    vessel_type: 'Survey vessel',
+    call_sign: 'A6API',
+    mmsi: 470900111,
+    flag: 'AE',
+    scenario_id: 'SCN_01_HEALTHY',
+    station_offset: { east_m: 400, north_m: -250 }
+  };
+
+  const cleanup = async () => {
+    for (const id of ['VSL_APITEST', 'VSL_APIDUP', 'VSL_APIBAD']) {
+      await request(app).delete(`/api/vessels/${id}`).set('Authorization', `Bearer ${adminToken}`);
+    }
+  };
+
+  beforeAll(cleanup);
+  afterAll(cleanup);
+
+  it('lists vessels with the reference data a form needs', async () => {
+    const response = await request(app).get('/api/vessels').set('Authorization', `Bearer ${adminToken}`);
+    expect(response.status).toBe(200);
+    expect(Array.isArray(response.body.items)).toBe(true);
+    // The client must never hard-code these: they would drift from the server.
+    expect(response.body.reference.scenarios.length).toBeGreaterThan(0);
+    expect(response.body.reference.sensors.length).toBeGreaterThan(0);
+  });
+
+  it('creates, reads, updates and deletes a vessel', async () => {
+    const created = await request(app)
+      .post('/api/vessels')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(NEW_VESSEL);
+    expect(created.status).toBe(201);
+    expect(created.body.vessel.id).toBe('VSL_APITEST');
+    expect(created.body.vessel.station_offset.east_m).toBe(400);
+
+    const read = await request(app)
+      .get('/api/vessels/VSL_APITEST')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(read.status).toBe(200);
+    // A new vessel carries the full sensor fit; removing one is a deliberate act.
+    expect(read.body.sensor_fit.every((s) => s.fitted)).toBe(true);
+
+    const updated = await request(app)
+      .put('/api/vessels/VSL_APITEST')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'API Test Renamed', notes: 'changed' });
+    expect(updated.status).toBe(200);
+    expect(updated.body.vessel.name).toBe('API Test Renamed');
+    // A partial update must not blank the fields it did not mention.
+    expect(updated.body.vessel.call_sign).toBe('A6API');
+
+    const removed = await request(app)
+      .delete('/api/vessels/VSL_APITEST')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(removed.status).toBe(200);
+
+    const gone = await request(app)
+      .get('/api/vessels/VSL_APITEST')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(gone.status).toBe(404);
+  });
+
+  it('names the field at fault rather than only rejecting', async () => {
+    const response = await request(app)
+      .post('/api/vessels')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ ...NEW_VESSEL, id: 'VSL_APIBAD', mmsi: null, scenario_id: 'SCN_DOES_NOT_EXIST' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('VESSEL_INVALID');
+    // A form can only highlight the offending field if the server says which.
+    expect(response.body.details.some((d) => d.field === 'scenario_id')).toBe(true);
+  });
+
+  it('refuses a vessel with no absolute positioning source', async () => {
+    const response = await request(app)
+      .post('/api/vessels')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        ...NEW_VESSEL,
+        id: 'VSL_APIBAD',
+        mmsi: null,
+        sensor_configuration: {
+          GNSS_01: { fitted: false },
+          RADAR_01: { fitted: false },
+          LIDAR_01: { fitted: false },
+          BATHY_01: { fitted: false },
+          LOCAL_01: { fitted: false }
+        }
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.details.some((d) => d.field === 'sensor_configuration')).toBe(true);
+  });
+
+  it('refuses a duplicate MMSI', async () => {
+    const first = await request(app)
+      .post('/api/vessels')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(NEW_VESSEL);
+    expect(first.status).toBe(201);
+
+    const clash = await request(app)
+      .post('/api/vessels')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ ...NEW_VESSEL, id: 'VSL_APIDUP', call_sign: 'A6DUP' });
+
+    expect(clash.status).toBe(400);
+    expect(clash.body.details.some((d) => d.field === 'mmsi')).toBe(true);
+
+    await request(app).delete('/api/vessels/VSL_APITEST').set('Authorization', `Bearer ${adminToken}`);
+  });
+
+  it('refuses to delete the focused vessel', async () => {
+    const list = await request(app).get('/api/vessels').set('Authorization', `Bearer ${adminToken}`);
+    const focused = list.body.items.find((v) => v.focused);
+    expect(focused).toBeTruthy();
+
+    const response = await request(app)
+      .delete(`/api/vessels/${focused.id}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    // Deleting it would leave the detail screens and the recorder following
+    // nothing.
+    expect(response.status).toBe(409);
+    expect(response.body.error).toBe('VESSEL_IS_FOCUSED');
+  });
+
+  it('rejects an identifier that is not safe to put in a log line', async () => {
+    const response = await request(app)
+      .post('/api/vessels')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ ...NEW_VESSEL, id: 'vsl bad/../id', mmsi: null });
+    expect(response.status).toBe(400);
+  });
+
+  it('requires the engineer role to change the register', async () => {
+    const response = await request(app)
+      .post('/api/vessels')
+      .set('Authorization', `Bearer ${viewerToken}`)
+      .send({ ...NEW_VESSEL, id: 'VSL_APIDUP', mmsi: null });
+    expect(response.status).toBe(403);
+  });
+});

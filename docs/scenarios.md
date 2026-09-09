@@ -300,3 +300,164 @@ result every time, which is what makes it fair to compare two configurations.
 > are synthetic, and none of it is navigational data. What these scenarios
 > demonstrate is the platform's *reasoning*, not its performance at sea — see
 > [limitations.md](limitations.md).
+
+---
+
+# How to present this to a client
+
+## Do not show all fifteen
+
+Fifteen scenarios is a reference list, not a presentation. An audience can hold
+about three ideas. Pick three scenarios that each make one point, and let the
+rest sit in this document as evidence that the work is thorough.
+
+## Lead with their problem, not your product
+
+Open with two questions, and wait for the answers:
+
+> "How do you know your position is right?"
+>
+> — *"GPS."*
+>
+> "And how would you know if it wasn't?"
+
+The second question usually gets a pause. That pause is your entire pitch. Every
+vessel has a position display; almost none can tell you whether to believe it.
+
+Then state the claim in one sentence, and be careful to state it narrowly:
+
+> We don't claim to create an accurate position out of nothing. We work out
+> which sources can be trusted, combine the ones that can, and tell you — before
+> it matters — when we can no longer guarantee two metres.
+
+## The three-act demonstration
+
+Roughly ten minutes of screen time. Each act makes exactly one point.
+
+### Act 1 — "It stays quiet when nothing is wrong" · scenario 1 · 2 minutes
+
+Start the healthy run. Let it sit. Point at the green banner and the zero
+false-alarm count.
+
+> Nothing is happening, and that is the point. A system that cries wolf gets
+> switched off in the first week. This one has raised no alarms in ten minutes
+> of healthy operation.
+
+Do not linger. This act only exists so that Act 2 means something.
+
+### Act 2 — "It catches what you cannot see" · scenario 3 · 5 minutes
+
+This is the one that sells the product. Start the gradual drag.
+
+At two minutes, before anything visible happens, say:
+
+> The attack has already started. GNSS is being pulled off track by one metre
+> every ten seconds. You cannot see it, and neither could the receiver — a
+> metre is ordinary GNSS noise. This is how it would actually be done.
+
+Then let them watch the two tracks separate on the chart. **Say nothing while
+that happens.** The picture is stronger than any sentence you have.
+
+When the alarm fires:
+
+> Caught at about three metres of offset. Read the alarm — it is a sentence, not
+> a code, and it names which independent sensor contradicted GNSS. And note what
+> it says: *deception*, not interference. The signal strength is perfect. That is
+> exactly what tells us this is an attack and not a fault.
+
+### Act 3 — "It tells you when it cannot help" · scenario 10 · 3 minutes
+
+Jump to the multiple-failure scenario and run to the point where everything has
+gone.
+
+> Everything independent is now gone. Look at what the system does.
+
+Point at **INTEGRITY NOT ASSURED** and the operator instruction.
+
+> The position is still on the screen — the operator is not left blind — but we
+> make no claim about it. A less honest system would still be showing you a
+> green light here, because it still *has* a position. Being able to prove a
+> position and merely having one are different things, and the difference is
+> what you would be buying.
+
+Then close the loop:
+
+> That is the whole product in one screen. Anyone can show you a position. We
+> will tell you when to stop trusting it.
+
+## Fitting the time you actually have
+
+| You have | Show | Why |
+|---|---|---|
+| **5 minutes** | Scenario 3 only | The gradual drag alone makes the case |
+| **10 minutes** | Acts 1–3 above | The full argument |
+| **20 minutes** | Add scenario 9 (recovery validation) | Shows judgement, not just detection — GNSS returns looking perfect and is still held out for 30 seconds |
+| **A full session** | Run scenario 15 end to end | The narrated 15-minute story; see [demo-script.md](demo-script.md) |
+
+If someone in the room is technical, add scenario 5 (flat seabed). Engineers
+respond to a system that says "I cannot answer this" far better than to one that
+always produces a number.
+
+## The question that will catch you out
+
+Someone will look at the results table and ask why the requirement is only met
+17 % of the time. Have this answer ready, because it decides the meeting:
+
+> Because for most of that run we deliberately took GNSS away. Without it,
+> radar matching in this harbour gives us a two-to-three metre bound — and three
+> metres does not prove two metres, so we say so.
+>
+> Look at the actual error instead: under half a metre, the whole way through.
+> We knew where the vessel was. What we would not do is *claim* an accuracy we
+> could not prove. If we had reported "met" through that section, the number
+> would have looked better and the system would have been lying to you.
+
+Then point at the misleading-information column:
+
+> That column counts the only failure that actually matters: moments when the
+> real error was worse than the bound we published, while we were telling you
+> the requirement was met. It is zero in eleven of fifteen scenarios. That is
+> the number a certification authority would ask for, and it is the number a
+> vendor is least likely to show you.
+
+## Other questions worth rehearsing
+
+**"Could an attacker fool the radar too?"**
+> Then we would be fooled, and we say so in our limitations document. The design
+> assumes radar reflecting off a mapped shoreline, sound bouncing off the
+> seabed, and inertial sensing cannot all be corrupted consistently by one radio
+> transmitter. Doing that is a physically different and far harder attack.
+
+**"Would this work with our sensors?"**
+> The adapter layer is vendor-neutral and NMEA 0183 is working today. NMEA 2000
+> and the shipboard-LAN transports are specified but not built — they need real
+> hardware to validate against, which is the next phase.
+
+**"Can it steer the vessel?"**
+> No, and not because we haven't got to it. There is no output path to steering
+> or DP anywhere in the system, and the read-only property cannot be switched
+> off. A decision-support system that can also act is a control system, and that
+> needs a completely different safety case.
+
+**"What would it cost us to find out if this works for real?"**
+> Recorded data. Give us twenty hours of your vessel logs with RTK truth
+> alongside, and we will tell you honestly whether our assumptions survive
+> contact with your sensors. That is Phase 2 in the roadmap, it needs no capital
+> and no vessel time, and it is designed to fail cheaply if it is going to fail.
+
+## Three things to say before you finish
+
+1. **This is a proof of concept.** Simulated sensors, synthetic seabed, never
+   been to sea, no type approval. Say it yourself before they ask — it buys you
+   credibility for everything else you claimed.
+2. **Every run is reproducible.** Same seed, same result, epoch for epoch. They
+   can change a threshold and see exactly what it costs.
+3. **The honest answer is the feature.** Not the accuracy, not the algorithms —
+   the willingness to say "not assured" when it is true.
+
+## What to leave behind
+
+- This document — what each scenario does and why.
+- An exported HTML performance report from the run you showed them.
+- [limitations.md](limitations.md) — leading with what the system *cannot* do is
+  the fastest way to be believed about what it can.

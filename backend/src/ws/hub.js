@@ -29,6 +29,7 @@ export const Frame = Object.freeze({
   ALARMS: 'alarms',
   MODE_TRANSITION: 'mode_transition',
   SCENARIO: 'scenario',
+  FLEET: 'fleet',
   REPLAY: 'replay',
   SENSORS: 'sensors',
   SYSTEM: 'system',
@@ -37,7 +38,7 @@ export const Frame = Object.freeze({
 });
 
 /** Channels a client can subscribe to. */
-const ALL_CHANNELS = ['navigation', 'sensors', 'alarms', 'scenario', 'system', 'replay'];
+const ALL_CHANNELS = ['navigation', 'sensors', 'alarms', 'scenario', 'system', 'replay', 'fleet'];
 
 const MAX_CLIENT_BUFFER_BYTES = 1 * 1024 * 1024;
 
@@ -233,6 +234,17 @@ export class LiveHub {
     for (const alarm of alarms ?? []) {
       this.broadcast('alarms', { type: Frame.ALARM, alarm });
     }
+  }
+
+  /**
+   * Publish the fleet overview.
+   *
+   * On its own channel and at its own, slower rate: a client showing the fleet
+   * list does not need every vessel at the full epoch rate, and a client
+   * watching one vessel in detail should not pay for the rest of the fleet.
+   */
+  publishFleet(snapshot) {
+    this.broadcast('fleet', { type: Frame.FLEET, fleet: snapshot });
   }
 
   publishScenarioState(status) {

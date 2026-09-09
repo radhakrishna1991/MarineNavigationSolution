@@ -5,6 +5,8 @@ import { getLiveClient } from './ws/liveClient';
 import { AppShell } from './components/AppShell';
 import { LoginPage } from './pages/LoginPage';
 import { NavigationPage } from './pages/NavigationPage';
+import { FleetPage } from './pages/FleetPage';
+import { VesselsPage } from './pages/VesselsPage';
 import { SensorsPage } from './pages/SensorsPage';
 import { GnssPage } from './pages/GnssPage';
 import { FusionPage } from './pages/FusionPage';
@@ -112,7 +114,9 @@ export function App() {
         <LiveConnection />
         <AppShell>
           <Routes>
-            <Route path="/" element={<NavigationPage />} />
+            <Route path="/" element={<FleetPage />} />
+            <Route path="/vessel" element={<NavigationPage />} />
+            <Route path="/vessels" element={<VesselsPage />} />
             <Route path="/sensors" element={<SensorsPage />} />
             <Route path="/gnss" element={<GnssPage />} />
             <Route path="/fusion" element={<FusionPage />} />

@@ -10,6 +10,10 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { loggedOut } from '../store/authSlice';
 import type {
+  FleetSnapshot,
+  Vessel,
+  VesselListResponse,
+  VesselSensorFit,
   Alarm,
   ConfigDescription,
   FaultTypeDef,
@@ -64,7 +68,7 @@ const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQuery
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithAuth,
-  tagTypes: ['Scenario', 'Alarms', 'Sensors', 'Config', 'Users', 'Runs', 'Replay', 'System', 'Audit'],
+  tagTypes: ['Scenario', 'Alarms', 'Sensors', 'Config', 'Users', 'Runs', 'Replay', 'System', 'Audit', 'Fleet', 'Vessels'],
   // Live data arrives over the WebSocket, so REST caches can be long-lived.
   keepUnusedDataFor: 120,
   endpoints: (builder) => ({
@@ -103,6 +107,38 @@ export const api = createApi({
     }),
 
     // --- System -------------------------------------------------------------
+    vessels: builder.query<VesselListResponse, void>({
+      query: () => '/vessels',
+      providesTags: ['Vessels']
+    }),
+    vessel: builder.query<{ vessel: Vessel; sensor_fit: VesselSensorFit[] }, string>({
+      query: (id) => `/vessels/${id}`,
+      providesTags: ['Vessels']
+    }),
+    createVessel: builder.mutation<{ vessel: Vessel }, Partial<Vessel> & { id: string; name: string }>({
+      query: (body) => ({ url: '/vessels', method: 'POST', body }),
+      invalidatesTags: ['Vessels', 'Fleet']
+    }),
+    updateVessel: builder.mutation<{ vessel: Vessel }, { id: string; changes: Partial<Vessel> }>({
+      query: ({ id, changes }) => ({ url: `/vessels/${id}`, method: 'PUT', body: changes }),
+      invalidatesTags: ['Vessels', 'Fleet']
+    }),
+    deleteVessel: builder.mutation<{ id: string; deleted: boolean }, string>({
+      query: (id) => ({ url: `/vessels/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Vessels', 'Fleet']
+    }),
+    applyFleet: builder.mutation<{ running: boolean }, void>({
+      query: () => ({ url: '/vessels/apply', method: 'POST' }),
+      invalidatesTags: ['Fleet']
+    }),
+    fleet: builder.query<FleetSnapshot, void>({
+      query: () => '/fleet',
+      providesTags: ['Fleet']
+    }),
+    fleetVessel: builder.query<Record<string, unknown>, string>({
+      query: (vesselId) => `/fleet/${vesselId}`,
+      providesTags: ['Fleet']
+    }),
     systemStatus: builder.query<SystemStatus, void>({
       query: () => '/system/status',
       providesTags: ['System']
@@ -325,6 +361,14 @@ export const api = createApi({
 });
 
 export const {
+  useVesselsQuery,
+  useVesselQuery,
+  useCreateVesselMutation,
+  useUpdateVesselMutation,
+  useDeleteVesselMutation,
+  useApplyFleetMutation,
+  useFleetQuery,
+  useFleetVesselQuery,
   useLoginMutation,
   useMeQuery,
   useChangePasswordMutation,

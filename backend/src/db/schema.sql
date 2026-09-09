@@ -65,6 +65,55 @@ CREATE TABLE IF NOT EXISTS sensors (
     updated_at                TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- ---------------------------------------------------------------------------
+-- Fleet.
+--
+-- A vessel is the unit an operator manages: an identity, where it works, and
+-- which sensors it is fitted with. Each one runs its own complete navigation
+-- pipeline, so `sensor_configuration` is per vessel rather than global - two
+-- vessels in the same fleet rarely have the same fit, and a single global
+-- sensor list would be wrong for both.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS vessels (
+    id                    TEXT PRIMARY KEY,
+    name                  TEXT NOT NULL,
+    vessel_type           TEXT,
+    call_sign             TEXT,
+    mmsi                  BIGINT UNIQUE,
+    imo                   BIGINT UNIQUE,
+    flag                  TEXT,
+    operator              TEXT,
+    length_m              DOUBLE PRECISION,
+    beam_m                DOUBLE PRECISION,
+    draft_m               DOUBLE PRECISION,
+
+    -- What this vessel is currently experiencing, and where it works.
+    scenario_id           TEXT REFERENCES scenarios(id) ON DELETE SET NULL,
+    start_offset_s        DOUBLE PRECISION NOT NULL DEFAULT 0,
+    station_offset_east_m DOUBLE PRECISION NOT NULL DEFAULT 0,
+    station_offset_north_m DOUBLE PRECISION NOT NULL DEFAULT 0,
+
+    -- Exactly one vessel is focused: the one the detail screens, the recorder
+    -- and fault injection follow. Enforced by a partial unique index below.
+    focused               BOOLEAN NOT NULL DEFAULT FALSE,
+    monitored             BOOLEAN NOT NULL DEFAULT TRUE,
+
+    -- Which sensors are fitted, and any per-vessel overrides for them.
+    sensor_configuration  JSONB NOT NULL DEFAULT '{}'::jsonb,
+    notes                 TEXT,
+
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_by            UUID REFERENCES users(id) ON DELETE SET NULL,
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_by            UUID REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- "The current run" would be ambiguous with two focused vessels.
+CREATE UNIQUE INDEX IF NOT EXISTS vessels_single_focus
+    ON vessels ((TRUE)) WHERE focused;
+
+CREATE INDEX IF NOT EXISTS vessels_monitored_idx ON vessels (monitored);
+
 CREATE TABLE IF NOT EXISTS scenarios (
     id                  TEXT PRIMARY KEY,
     name                TEXT NOT NULL,

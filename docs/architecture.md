@@ -371,7 +371,7 @@ assured-marine-navigation/
 │   │   ├── middleware/           auth, RBAC, validation, rate limits, audit
 │   │   ├── ws/hub.js             live stream with back-pressure handling
 │   │   └── utils/                geo · matrix · stats · random · logger
-│   └── tests/                    185 tests
+│   └── tests/                    209 tests
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/                navigation · sensors · gnss · fusion ·
@@ -384,7 +384,7 @@ assured-marine-navigation/
 │   │   ├── api/api.ts            RTK Query
 │   │   ├── ws/liveClient.ts      reconnecting WebSocket client
 │   │   └── utils/                formatting, status vocabulary
-│   └── tests/                    63 tests
+│   └── tests/                    67 tests
 ├── data/exports/                 export output
 └── scripts/                      generate_demo_data · run_scenario ·
                                   export_results · seed_database
@@ -417,7 +417,7 @@ assured-marine-navigation/
 | 5 | Navigation: dead reckoning, radar/LiDAR matching (both modes), bathymetric matching, optional INS, EKF | complete |
 | 6 | Integrity: residual monitoring, FDE, protection level, requirement status | complete |
 | 7 | Analytics: performance charts, scenario report, CSV/JSON/GeoJSON/KML/HTML export | complete |
-| 8 | Testing and documentation: 248 automated tests, demo script, limitations, deployment, security notes | complete |
+| 8 | Testing and documentation: 276 automated tests, demo script, limitations, deployment, security notes | complete |
 
 ---
 
@@ -468,6 +468,7 @@ Listed so that nothing is mistaken for present:
 | What are the safety properties? | [safety.md](safety.md) |
 | What is the security posture? | [security.md](security.md) |
 | How was it tested? | [test-plan.md](test-plan.md) |
+| How is the position actually derived? | [how-it-works.md](how-it-works.md) |
 | What does each scenario show? | [scenarios.md](scenarios.md) |
 | How do I run the demonstration? | [demo-script.md](demo-script.md) |
 | Where does it go from here? | [roadmap.md](roadmap.md) |

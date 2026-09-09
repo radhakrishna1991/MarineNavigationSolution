@@ -1,0 +1,85 @@
+# ---------------------------------------------------------------------------
+# Fleet definition.
+#
+# Each vessel runs its own complete navigation pipeline - its own sensors, its
+# own GNSS trust engine, its own filter and its own integrity calculation.
+# Nothing is shared between them, because in service nothing would be: a
+# spoofing attack on one vessel says nothing about the others, and an operator
+# watching a fleet needs each answer to stand on its own.
+#
+# `scenario` selects what that vessel is experiencing. A fleet in which every
+# vessel is healthy demonstrates nothing, so the default fleet deliberately has
+# vessels in several different states at once - which is also what a real
+# operations room looks like.
+#
+# `start_offset_s` staggers vessels along their route. It is simulated at full
+# fidelity when the fleet starts, so keep it modest: every second here costs
+# real computation before that vessel appears.
+#
+# `station_offset` moves where the vessel actually works within the operating
+# area. Stagger alone is not enough - vessels running the same route at similar
+# speeds stay bunched, and the fleet display shows one dot. The offset is
+# applied to the route itself, so the seabed, the shoreline and every sensor
+# still see the real environment at that position.
+# ---------------------------------------------------------------------------
+
+fleet:
+  # How often the fleet overview is published. The focused vessel streams at the
+  # full epoch rate; the rest do not need to, and a fleet of twenty at 5 Hz is
+  # bandwidth spent on detail nobody is reading.
+  broadcast_interval_s: 1.0
+
+  vessels:
+    - id: VSL_SURVEYOR
+      name: Safeen Surveyor
+      type: Survey vessel
+      call_sign: A6SVY
+      mmsi: 470123001
+      scenario: SCN_15_SAFEEN_DEMO
+      start_offset_s: 0
+      focused: true
+
+    - id: VSL_FALCON
+      name: Safeen Falcon
+      type: Offshore support
+      call_sign: A6FLC
+      mmsi: 470123002
+      scenario: SCN_01_HEALTHY
+      start_offset_s: 40
+      station_offset: { east_m: 900, north_m: 600 }
+
+    - id: VSL_DHAFRA
+      name: Al Dhafra
+      type: Survey vessel
+      call_sign: A6DHF
+      mmsi: 470123003
+      scenario: SCN_03_GRADUAL_DRAG
+      start_offset_s: 80
+      station_offset: { east_m: -750, north_m: 300 }
+
+    - id: VSL_MARAWAH
+      name: Marawah
+      type: Dredger
+      call_sign: A6MRW
+      mmsi: 470123004
+      scenario: SCN_06_RADAR_LOSS
+      start_offset_s: 120
+      station_offset: { east_m: 1500, north_m: -450 }
+
+    - id: VSL_BUTINAH
+      name: Bu Tinah
+      type: Patrol craft
+      call_sign: A6BTN
+      mmsi: 470123005
+      scenario: SCN_04_JAMMING
+      start_offset_s: 160
+      station_offset: { east_m: -1200, north_m: -700 }
+
+    - id: VSL_ZIRKU
+      name: Zirku
+      type: Harbour tug
+      call_sign: A6ZRK
+      mmsi: 470123006
+      scenario: SCN_14_LOCAL_POSITIONING
+      start_offset_s: 20
+      station_offset: { east_m: 350, north_m: -1100 }

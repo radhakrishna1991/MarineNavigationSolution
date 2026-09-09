@@ -1,6 +1,6 @@
 # Test plan and results
 
-248 automated tests: 185 backend (Jest), 63 frontend (Vitest + React Testing
+276 automated tests: 209 backend (Jest), 67 frontend (Vitest + React Testing
 Library). Run with `npm test`.
 
 ---
@@ -76,7 +76,7 @@ named; the remaining unassisted time is reported.
 better than 3 m from a 6 m seed offset; the vendor fix is used when no point
 cloud is available.
 
-## 4. Integrity and modes — `tests/integrity.test.js` (24 tests)
+## 4. Integrity and modes — `tests/integrity.test.js` (30 tests)
 
 Section 24 "Integrity".
 
@@ -104,6 +104,14 @@ reason; all 14 modes publish guidance and successors.
 
 **Configuration (1):** the requirement limit and recovery window are the values
 the specification asks for.
+
+**Time integrity (6):** GNSS is the source while it is trusted and contributing;
+UTC falls into holdover the moment GNSS stops contributing, *and* when the GNSS
+clock itself is under suspicion even though its position is still being used -
+the same transmitter controls both; the bound grows with holdover duration;
+before any trusted reference the source is `UNKNOWN` and the bound is null
+rather than zero, because a bound that cannot be computed is not a small bound;
+and it recovers when a trusted reference returns.
 
 ## 5. Replay and scenarios — `tests/replay.test.js` (26 tests)
 
@@ -136,6 +144,28 @@ marked complete.
 so a report generated the moment a run ends sees the whole run; two flushes never
 overlap; a flush that fails does not stall every flush after it.
 
+## 5a. Fleet — `tests/fleet.test.js` (10 tests)
+
+Fleet monitoring runs a complete, independent pipeline per vessel. The property
+under test is that independence: if two vessels shared a filter, a trust
+assessment or an integrity calculation, one vessel being attacked would corrupt
+the answer for another, and a fleet display would be worse than none.
+
+Configuration: every declared vessel references a real scenario; identities and
+MMSIs are unique; exactly one vessel is nominated as focused, so "the current
+run" is never ambiguous.
+
+Service: no mutable state is shared between vessels — engine, pipeline, filter,
+vessel model and RNG are all distinct — while the environment *is* deliberately
+shared, because it is read-only reference data and copying the depth grid per
+vessel would cost megabytes for nothing. A spoofed vessel and a healthy one
+reach different verdicts, and the healthy one's GNSS is untouched by its
+neighbour's attack. A station offset moves one vessel's route without mutating
+the shared environment — which would otherwise move the whole fleet. The
+summary carries every field the display needs, the counts are the states an
+operations room acts on, `stop()` releases everything and ticking afterwards is
+a no-op, and one vessel throwing does not stop the rest.
+
 ## 6. Adapters — `tests/adapters.test.js` (34 tests)
 
 **NMEA 0183 (13):** checksum verification and rejection of a corrupted sentence;
@@ -160,7 +190,7 @@ negative sequence number, unknown top-level fields, a hostile `sensor_id`, and
 declared honestly, every placeholder documents its contract, and the base adapter
 validates before forwarding and counts rejections.
 
-## 7. API integration — `tests/api.test.js` (59 tests)
+## 7. API integration — `tests/api.test.js` (67 tests)
 
 Runs against the real Express app and the real database.
 
@@ -175,6 +205,15 @@ out-of-bounds and immutable-path rejection · cross-field consistency · data
 ingestion and validation · CSV replay import, playback and deletion · user
 administration with password policy and duplicate rejection · and the
 database-level proof that the audit log rejects UPDATE and DELETE.
+
+**Vessel management (8):** the register lists vessels with the reference data a
+form needs, so the client never hard-codes a list that could drift from the
+server; a vessel is created, read, updated and deleted, with a partial update
+leaving unmentioned fields alone; validation names the field at fault rather
+than only rejecting; a vessel with no absolute positioning source is refused,
+because it could never report the requirement as met; a duplicate MMSI is
+refused; the focused vessel cannot be deleted; an identifier that is not safe in
+a log line is rejected; and changing the register requires the engineer role.
 
 **Malformed identifiers (7):** a path or query identifier that is not a UUID is
 rejected with 400 on every route that takes one, a well-formed identifier that
@@ -332,8 +371,8 @@ everywhere.
 
 ```bash
 npm test                      # everything
-npm run test:backend          # 185 backend tests
-npm run test:frontend         # 63 frontend tests
+npm run test:backend          # 209 backend tests
+npm run test:frontend         # 67 frontend tests
 
 # One suite
 npm run test --workspace backend -- tests/integrity.test.js

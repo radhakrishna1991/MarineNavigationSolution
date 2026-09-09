@@ -333,6 +333,51 @@ navigation."**
 
 ---
 
+## Vessels
+
+The fleet register. This is the one place an operator creates data rather than
+observing it, so validation is returned per field: a form can highlight what is
+wrong rather than only saying "rejected".
+
+| Endpoint | Role | Notes |
+|---|---|---|
+| `GET /api/vessels` | viewer | All vessels, plus the scenario and sensor lists a form needs so the client never hard-codes them |
+| `GET /api/vessels/{id}` | viewer | One vessel, its resolved sensor fit, and its live state if it is running |
+| `POST /api/vessels` | engineer | Create. `201` with the stored record |
+| `PUT /api/vessels/{id}` | engineer | Partial update — fields not mentioned are left alone |
+| `DELETE /api/vessels/{id}` | engineer | `409 VESSEL_IS_FOCUSED` if it is the focused vessel |
+| `POST /api/vessels/apply` | engineer | Rebuild the running fleet from the register |
+
+A `400 VESSEL_INVALID` carries a `details` array of `{ field, message }`. Two
+rules are worth knowing:
+
+- **No absolute positioning source** is refused. Such a vessel could never
+  report the requirement as met, because there would be nothing to bound its
+  position against — better to say so at configuration time than leave an
+  operator wondering why it never goes green.
+- **No heading reference** is refused. The filter cannot be initialised without
+  one.
+
+Editing a vessel changes what *will* be monitored. `POST /api/vessels/apply`
+rebuilds the running fleet, which restarts each pipeline and discards its filter
+state — a deliberate step, not something that happens as the operator types.
+
+## Fleet
+
+Several vessels, each running its own complete navigation pipeline. Nothing is
+shared between them.
+
+| Endpoint | Role | Notes |
+|---|---|---|
+| `GET /api/fleet` | viewer | Every vessel's current state plus fleet-wide counts |
+| `GET /api/fleet/{vesselId}` | viewer | One vessel in full. `409` if configured but not yet joined, `404` if unknown |
+| `POST /api/fleet/start` | operator | Returns immediately; vessels join as they wind forward to their staggered positions |
+| `POST /api/fleet/stop` | operator | |
+
+The fleet is also streamed on the `fleet` WebSocket channel, at its own slower
+rate — a client showing the fleet list does not need every vessel at the full
+epoch rate.
+
 ## Users and audit
 
 | Endpoint | Role | Purpose |

@@ -13,6 +13,7 @@ import { sidebarToggled, toastDismissed } from '../store/uiSlice';
 import { signedOut } from '../store/authSlice';
 import { CompactStatus } from './StatusBanner';
 import { ThemeToggle } from './ThemeToggle';
+import { SourceIndicator } from './SourceIndicator';
 import { SEVERITY_PRESENTATION } from '../utils/status';
 import { hasRole } from '../store/authSlice';
 import type { Role } from '../types';
@@ -26,7 +27,9 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'Navigation', glyph: '◎', description: 'Live map, trusted position and requirement status' },
+  { to: '/', label: 'Fleet', glyph: '⛴', description: 'Every monitored vessel, ordered by the attention it needs' },
+  { to: '/vessel', label: 'Navigation', glyph: '◎', description: 'Live chart, trusted position and requirement status' },
+  { to: '/vessels', label: 'Vessels', glyph: '⚓', description: 'Manage the fleet register and the sensor fit of each vessel' },
   { to: '/sensors', label: 'Sensors', glyph: '▤', description: 'Per-sensor health, residuals and decisions' },
   { to: '/gnss', label: 'GNSS Integrity', glyph: '◈', description: 'Trust score, anomalies and cross-checks' },
   { to: '/fusion', label: 'Fusion & Integrity', glyph: '⬡', description: 'Filter state, covariance and protection level' },
@@ -162,8 +165,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <p className="truncate text-sm font-semibold leading-tight text-bridge-100">
               iSpatialTec <span className="text-bridge-400">Assured Marine Navigation</span>
             </p>
-            <p className="truncate text-[10px] uppercase tracking-[0.14em] text-caution">
-              Proof of concept · decision support only · not for navigation
+            <p className="truncate text-[10px] uppercase tracking-[0.14em] text-bridge-400">
+              Resilient PNT · integrity monitoring · fleet assurance
             </p>
           </div>
         </div>
@@ -172,6 +175,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="hidden xl:block">
             <CompactStatus navigation={navigation} />
           </div>
+          <SourceIndicator compact />
           <ConnectionPill />
           <AlarmBell />
           <div className="hidden md:block">
@@ -236,8 +240,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               <ThemeToggle />
             </div>
             <p className="text-[10px] leading-relaxed text-bridge-500">
-              Demonstration geospatial data — not for navigation. This platform has no control interface to
-              autopilot, DP, propulsion or steering gear.
+              Monitoring and decision support. This platform has no control interface to autopilot, DP,
+              propulsion or steering gear.
             </p>
           </div>
         </nav>

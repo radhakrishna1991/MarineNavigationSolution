@@ -29,6 +29,7 @@ import GnssIntegrityEngine from './gnssIntegrity.js';
 import FaultDetectionEngine from './faultDetection.js';
 import IntegrityEngine from './integrity.js';
 import ModeManager from './modeManager.js';
+import { TimeIntegrityMonitor } from './timeIntegrity.js';
 import { haversineMetres, normalizeHeading } from '../utils/geo.js';
 import { createLogger } from '../utils/logger.js';
 
@@ -58,6 +59,7 @@ export class NavigationPipeline {
     this.faultDetector = new FaultDetectionEngine({ sensorDefinitions: sensorCatalog });
     this.integrityEngine = new IntegrityEngine();
     this.modeManager = new ModeManager();
+    this.timeIntegrity = new TimeIntegrityMonitor();
 
     this.gnssEngine.setEpoch(epochMs);
     this.faultDetector.setEpoch(epochMs);
@@ -67,6 +69,7 @@ export class NavigationPipeline {
 
   reset() {
     this.fusion.reset();
+    this.timeIntegrity.reset();
     this.deadReckoning.reset();
     this.bathyEngine.reset();
     this.gnssEngine.reset();
@@ -752,6 +755,11 @@ export class NavigationPipeline {
       unresolvedCriticalFault
     });
 
+    // --- 9b. Time integrity ---------------------------------------------------
+    // Position is not the only thing GNSS provides, nor the only thing an
+    // attacker can falsify. Once GNSS is rejected, UTC is in holdover.
+    const timeIntegrity = this.timeIntegrity.evaluate({ time, gnssResult, gnssUsed });
+
     // --- 10. Mode state machine ----------------------------------------------
     const context = this.buildModeContext({
       gnssResult,
@@ -783,6 +791,7 @@ export class NavigationPipeline {
       time,
       solution,
       integrity,
+      timeIntegrity,
       gnssResult,
       gnssUsed,
       radarResult,
@@ -1204,6 +1213,7 @@ export class NavigationPipeline {
     time,
     solution,
     integrity,
+    timeIntegrity,
     gnssResult,
     gnssUsed,
     radarResult,
@@ -1243,6 +1253,8 @@ export class NavigationPipeline {
     return {
       time_s: Number(time.toFixed(3)),
       timestamp_utc: new Date(this.epochMs + time * 1000).toISOString(),
+      // Whether that timestamp can be relied upon, and on what basis.
+      time_integrity: timeIntegrity ?? null,
       trusted_position: solution.available
         ? {
             latitude: solution.latitude,

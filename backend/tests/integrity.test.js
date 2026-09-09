@@ -7,6 +7,7 @@
  */
 
 import { IntegrityEngine } from '../src/navigation/integrity.js';
+import { TimeIntegrityMonitor } from '../src/navigation/timeIntegrity.js';
 import { ModeManager, evaluateCondition } from '../src/navigation/modeManager.js';
 import { getConfig } from '../src/config/index.js';
 import { RequirementStatus, IntegrityStatus } from '../src/models/enums.js';
@@ -441,5 +442,84 @@ describe('configuration', () => {
     expect(cfg.requirements.horizontal_error_limit_m).toBe(2.0);
     expect(cfg.requirements.at_risk_lower_bound_m).toBeLessThan(cfg.requirements.horizontal_error_limit_m);
     expect(cfg.gnss_integrity.recovery_validation_s).toBe(30);
+  });
+});
+
+/**
+ * Time integrity.
+ *
+ * Satellite navigation solves for time and position together, so a spoofed
+ * receiver usually reports a false clock as well - and on a vessel that clock
+ * timestamps the survey data, the voyage data recorder and every log line
+ * written afterwards. Once GNSS is rejected, UTC is in holdover and the display
+ * must say so rather than presenting a timestamp as though it were disciplined.
+ */
+describe('time integrity', () => {
+  const gnss = (conditions = []) => ({
+    detected_conditions: conditions,
+    diagnostics: { time_offset_s: 0.05 }
+  });
+
+  it('reports GNSS as the source while GNSS is trusted and contributing', () => {
+    const monitor = new TimeIntegrityMonitor();
+    const result = monitor.evaluate({ time: 10, gnssResult: gnss(), gnssUsed: true });
+
+    expect(result.utc_source).toBe('GNSS');
+    expect(result.utc_trusted).toBe(true);
+    expect(result.holdover_duration_s).toBe(0);
+  });
+
+  it('falls into holdover the moment GNSS stops contributing', () => {
+    const monitor = new TimeIntegrityMonitor();
+    monitor.evaluate({ time: 10, gnssResult: gnss(), gnssUsed: true });
+    const result = monitor.evaluate({ time: 40, gnssResult: gnss(), gnssUsed: false });
+
+    expect(result.utc_source).toBe('HOLDOVER');
+    expect(result.last_trusted_reference_age_s).toBeCloseTo(30, 1);
+  });
+
+  it('distrusts the GNSS clock even while GNSS is still contributing', () => {
+    // The same transmitter controls position and time. A receiver reporting a
+    // false clock cannot be trusted for time just because its position is
+    // still being used.
+    const monitor = new TimeIntegrityMonitor();
+    monitor.evaluate({ time: 10, gnssResult: gnss(), gnssUsed: true });
+    const result = monitor.evaluate({
+      time: 20,
+      gnssResult: gnss(['GNSS_TIME_JUMP']),
+      gnssUsed: true
+    });
+
+    expect(result.utc_source).toBe('HOLDOVER');
+    expect(result.reasons.join(' ')).toMatch(/clock is under suspicion/i);
+  });
+
+  it('grows the bound the longer it runs in holdover', () => {
+    const monitor = new TimeIntegrityMonitor();
+    monitor.evaluate({ time: 0, gnssResult: gnss(), gnssUsed: true });
+    const early = monitor.evaluate({ time: 100, gnssResult: gnss(), gnssUsed: false });
+    const late = monitor.evaluate({ time: 100000, gnssResult: gnss(), gnssUsed: false });
+
+    expect(late.utc_error_bound_s).toBeGreaterThan(early.utc_error_bound_s);
+  });
+
+  it('reports UNKNOWN, not zero error, before any trusted reference', () => {
+    // A bound that cannot be computed is not a small bound.
+    const monitor = new TimeIntegrityMonitor();
+    const result = monitor.evaluate({ time: 5, gnssResult: gnss(), gnssUsed: false });
+
+    expect(result.utc_source).toBe('UNKNOWN');
+    expect(result.utc_trusted).toBe(false);
+    expect(result.utc_error_bound_s).toBeNull();
+  });
+
+  it('recovers to GNSS when a trusted reference returns', () => {
+    const monitor = new TimeIntegrityMonitor();
+    monitor.evaluate({ time: 0, gnssResult: gnss(), gnssUsed: true });
+    monitor.evaluate({ time: 60, gnssResult: gnss(), gnssUsed: false });
+    const recovered = monitor.evaluate({ time: 120, gnssResult: gnss(), gnssUsed: true });
+
+    expect(recovered.utc_source).toBe('GNSS');
+    expect(recovered.holdover_duration_s).toBe(0);
   });
 });

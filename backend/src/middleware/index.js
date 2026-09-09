@@ -297,6 +297,11 @@ export function errorHandler(err, req, res, next) {
       status >= 500
         ? 'An unexpected error occurred. Quote the correlation id when reporting this.'
         : err.message,
+    // Field-level problems, when the thrower supplied them. Without these a
+    // form can only say "rejected" and leave the operator guessing which of a
+    // dozen fields was wrong. Never attached to a 5xx: internal detail must
+    // not leave the server.
+    ...(status < 500 && Array.isArray(err.details) ? { details: err.details } : {}),
     correlation_id: correlationId
   });
 }

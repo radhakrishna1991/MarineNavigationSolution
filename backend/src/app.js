@@ -25,6 +25,8 @@ import navigationRoutes from './api/routes/navigation.js';
 import scenarioRoutes from './api/routes/scenarios.js';
 import performanceRoutes from './api/routes/performance.js';
 import ingestRoutes from './api/routes/ingest.js';
+import fleetRoutes from './api/routes/fleet.js';
+import vesselRoutes from './api/routes/vessels.js';
 import { createLogger } from './utils/logger.js';
 
 const log = createLogger('app');
@@ -149,6 +151,8 @@ export function createApp() {
   app.use('/api', scenarioRoutes);
   app.use('/api', performanceRoutes);
   app.use('/api', ingestRoutes);
+  app.use('/api', fleetRoutes);
+  app.use('/api', vesselRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

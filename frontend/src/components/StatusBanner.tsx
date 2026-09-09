@@ -203,10 +203,50 @@ export function StatusBanner({ navigation }: { navigation: NavigationOutput | nu
 }
 
 /** Compact single-line variant used in the header on narrow screens. */
-export function CompactStatus({ navigation }: { navigation: NavigationOutput | null }) {
-  if (!navigation) {
-    return <span className="text-xs text-bridge-400">No solution</span>;
+/**
+ * Header status.
+ *
+ * Falls back to fleet health when no single vessel is under detailed
+ * examination. On a fleet product the header should never be dead space: an
+ * operator glancing up wants to know whether anything needs them, and "No
+ * solution" answers a question nobody asked.
+ */
+/** Fleet-wide counts, shown in the header when no vessel is focused. */
+function FleetHealth() {
+  const fleet = useAppSelector((s) => s.live.fleet);
+  if (!fleet || fleet.counts.total === 0) {
+    return <span className="text-xs text-bridge-400">No vessels monitored</span>;
   }
+  const { counts } = fleet;
+  const needsAttention = counts.requirement_not_met + counts.integrity_not_assured;
+  return (
+    <div className="flex items-center gap-2" title="Fleet requirement status">
+      <span className="chip border-bridge-600 bg-bridge-800 text-bridge-300">
+        <span aria-hidden>⛴</span>
+        {counts.total} VESSELS
+      </span>
+      <span className="chip border-assured/50 bg-assured/15 text-assured">
+        <span aria-hidden>✓</span>
+        {counts.requirement_met} MET
+      </span>
+      {counts.requirement_at_risk > 0 && (
+        <span className="chip border-caution/50 bg-caution/15 text-caution">
+          <span aria-hidden>▲</span>
+          {counts.requirement_at_risk} AT RISK
+        </span>
+      )}
+      {needsAttention > 0 && (
+        <span className="chip border-critical/50 bg-critical/15 text-critical">
+          <span aria-hidden>✕</span>
+          {needsAttention} NEEDS ATTENTION
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function CompactStatus({ navigation }: { navigation: NavigationOutput | null }) {
+  if (!navigation) return <FleetHealth />;
   const requirement = REQUIREMENT_PRESENTATION[navigation.integrity.requirement_status];
   const mode = modePresentation(navigation.navigation_mode);
   return (

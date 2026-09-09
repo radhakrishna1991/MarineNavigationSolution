@@ -236,6 +236,7 @@ export interface ModeDetail {
 export interface NavigationOutput {
   time_s: number;
   timestamp_utc: string;
+  time_integrity?: TimeIntegrity | null;
   trusted_position: { latitude: number; longitude: number; east_m: number; north_m: number } | null;
   velocity: { north_mps: number; east_mps: number; speed_mps: number } | null;
   course_deg: number | null;
@@ -533,4 +534,111 @@ export interface GeoBundle {
   }>;
   radar_feature_count: number;
   lidar_feature_count: number;
+}
+
+
+/** One vessel in the monitored fleet. */
+export interface FleetVessel {
+  vessel_id: string;
+  name: string;
+  type: string | null;
+  call_sign: string | null;
+  mmsi: number | null;
+  scenario_id: string;
+  scenario_name: string | null;
+  sim_time_s: number | null;
+  position: { latitude: number; longitude: number } | null;
+  heading_deg: number | null;
+  speed_mps: number | null;
+  course_deg: number | null;
+  navigation_mode: NavigationMode | null;
+  mode_label: string | null;
+  operator_guidance: string | null;
+  solution_available: boolean;
+  requirement_status: RequirementStatus | null;
+  integrity_status: IntegrityStatus | null;
+  horizontal_protection_level_m: number | null;
+  requirement_limit_m: number | null;
+  independent_absolute_sources: number;
+  protection_level_growth_rate_m_per_s: number | null;
+  dead_reckoning_duration_s: number | null;
+  gnss_trust_score: number | null;
+  gnss_status: GnssTrustStatus | null;
+  gnss_spoofing_suspected: boolean;
+  gnss_jamming_suspected: boolean;
+  contributing_sensors: string[];
+  excluded_sensors: string[];
+  ground_truth: { latitude: number; longitude: number } | null;
+  actual_error_m: number | null;
+}
+
+export interface FleetSnapshot {
+  running: boolean;
+  broadcast_interval_s: number;
+  configured_vessels?: number;
+  counts: {
+    total: number;
+    requirement_met: number;
+    requirement_at_risk: number;
+    requirement_not_met: number;
+    integrity_not_assured: number;
+    gnss_rejected: number;
+    under_attack: number;
+  };
+  vessels: FleetVessel[];
+}
+
+
+/** A managed vessel record. */
+export interface Vessel {
+  id: string;
+  name: string;
+  vessel_type: string | null;
+  call_sign: string | null;
+  mmsi: number | null;
+  imo: number | null;
+  flag: string | null;
+  operator: string | null;
+  dimensions: { length_m: number | null; beam_m: number | null; draft_m: number | null };
+  scenario_id: string | null;
+  scenario_name: string | null;
+  start_offset_s: number;
+  station_offset: { east_m: number; north_m: number };
+  focused: boolean;
+  monitored: boolean;
+  sensor_configuration: Record<string, { fitted?: boolean; notes?: string | null }>;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VesselSensorFit {
+  sensor_id: string;
+  sensor_type: string;
+  name: string;
+  absolute_position_source: boolean;
+  fitted: boolean;
+  notes: string | null;
+}
+
+export interface VesselListResponse {
+  items: Vessel[];
+  total: number;
+  reference: {
+    scenarios: Array<{ id: string; name: string; category: string }>;
+    sensors: Array<{ sensor_id: string; sensor_type: string; name: string; absolute_position_source: boolean }>;
+  };
+}
+
+
+/** Whether the published UTC timestamp can be relied upon, and on what basis. */
+export interface TimeIntegrity {
+  utc_source: 'GNSS' | 'HOLDOVER' | 'UNKNOWN';
+  utc_trusted: boolean;
+  utc_error_bound_s: number | null;
+  required_accuracy_s: number;
+  holdover_duration_s: number;
+  last_trusted_reference_age_s: number | null;
+  measured_gnss_offset_s: number | null;
+  reasons: string[];
 }

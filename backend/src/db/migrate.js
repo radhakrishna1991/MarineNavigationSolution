@@ -34,6 +34,7 @@ const DROP_ORDER = [
   'reference_point_clouds',
   'bathymetry_grids',
   'map_layers',
+  'vessels',
   'scenarios',
   'sensors',
   'config_overrides',

@@ -134,7 +134,7 @@ export function MapView({
     map.addControl(
       new maplibregl.AttributionControl({
         compact: true,
-        customAttribution: 'Synthetic demonstration data · not for navigation'
+        customAttribution: 'iSpatialTec Assured Marine Navigation'
       }),
       'bottom-right'
     );
@@ -807,11 +807,6 @@ export function MapView({
   return (
     <div className={`relative overflow-hidden rounded-lg border border-bridge-700 ${className}`}>
       <div ref={container} className="h-full w-full" />
-
-      {/* Demonstration label, permanently visible over the chart. */}
-      <div className="pointer-events-none absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded border border-caution/40 bg-bridge-950/85 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-caution backdrop-blur">
-        Demonstration geospatial data — not for navigation
-      </div>
 
       {showControls && (
         <>

@@ -20,6 +20,8 @@ import { recorder } from './services/recorder.js';
 import { liveHub } from './ws/hub.js';
 import { setIngestHandler } from './api/routes/ingest.js';
 import { UdpIngestAdapter } from './adapters/udpIngest.js';
+import { fleetService } from './services/fleetService.js';
+import { vesselService } from './services/vesselService.js';
 import { validateSensorMessage } from './models/sensorMessage.js';
 import { createLogger } from './utils/logger.js';
 
@@ -56,6 +58,7 @@ function ingestExternalMessage(message, meta = {}) {
 }
 
 function wireEvents() {
+  fleetService.on('fleet', (snapshot) => liveHub.publishFleet(snapshot));
   scenarioService.on('epoch', (payload) => liveHub.publishEpoch(payload));
   scenarioService.on('state', (status) => liveHub.publishScenarioState(status));
   scenarioService.on('mode_transition', (t) => liveHub.publishModeTransition(t));
@@ -104,6 +107,17 @@ async function start() {
   const app = createApp();
   server = http.createServer(app);
   liveHub.attach(server, { onIngest: ingestExternalMessage });
+
+  // Fleet monitoring starts with the server. Vessels wind forward to their
+  // staggered positions in the background and join as they become ready, so
+  // this does not delay the server accepting connections.
+  // Seed the vessel table from configuration on a fresh install, then start
+  // monitoring from whatever the database holds.
+  vesselService
+    .seedFromConfig()
+    .catch((err) => log.warn('fleet seeding skipped', { message: err.message }))
+    .then(() => fleetService.start())
+    .catch((err) => log.error('fleet failed to start', { message: err.message }));
   wireEvents();
 
   if (env.udp.enabled) {
@@ -146,6 +160,7 @@ async function shutdown(signal) {
   timeout.unref();
 
   try {
+    await fleetService.shutdown();
     await scenarioService.shutdown();
     await replayService.stop();
     await recorder.stop();

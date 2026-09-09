@@ -12,6 +12,7 @@ import {
   alarmReceived,
   connectionChanged,
   navigationReceived,
+  fleetReceived,
   replayStateReceived,
   scenarioStateReceived
 } from '../store/liveSlice';
@@ -62,7 +63,10 @@ export class LiveClient {
       this.attempt = 0;
       this.dispatch(connectionChanged({ state: 'open' }));
       socket.send(
-        JSON.stringify({ type: 'subscribe', channels: ['navigation', 'alarms', 'scenario', 'replay', 'system'] })
+        JSON.stringify({
+          type: 'subscribe',
+          channels: ['navigation', 'alarms', 'scenario', 'replay', 'system', 'fleet']
+        })
       );
     };
 
@@ -97,6 +101,9 @@ export class LiveClient {
           break;
         case 'replay':
           if (frame.replay) this.dispatch(replayStateReceived(frame.replay));
+          break;
+        case 'fleet':
+          if (frame.fleet) this.dispatch(fleetReceived(frame.fleet));
           break;
         case 'error':
           this.dispatch(connectionChanged({ state: 'error', error: frame.message ?? frame.error }));

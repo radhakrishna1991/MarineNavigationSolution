@@ -137,6 +137,7 @@ const defaults = readYaml('default.yaml');
 const modes = readYaml('modes.yaml');
 const sensorsDoc = readYaml('sensors.yaml');
 const scenariosDoc = readYaml('scenarios.yaml');
+const fleetDoc = readYaml('fleet.yaml');
 
 let runtimeOverrides = {};
 let effective = defaults;
@@ -201,6 +202,7 @@ export function onConfigChange(fn) {
 export const modeConfig = modes;
 export const sensorCatalog = sensorsDoc.sensors;
 export const scenarioCatalog = scenariosDoc.scenarios;
+export const fleetConfig = fleetDoc.fleet;
 
 /** Look up a sensor definition by id. */
 export function getSensorDefinition(sensorId) {

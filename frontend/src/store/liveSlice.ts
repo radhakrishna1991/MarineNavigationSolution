@@ -13,7 +13,7 @@
  */
 
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { Alarm, NavigationOutput, ReplayStatus, ScenarioStatus } from '../types';
+import type { Alarm, FleetSnapshot, NavigationOutput, ReplayStatus, ScenarioStatus } from '../types';
 
 export type ConnectionState = 'idle' | 'connecting' | 'open' | 'closed' | 'error';
 
@@ -50,6 +50,8 @@ interface LiveState {
   navigation: NavigationOutput | null;
   scenario: ScenarioStatus | null;
   replay: ReplayStatus | null;
+  /** The monitored fleet, updated on its own slower channel. */
+  fleet: FleetSnapshot | null;
   activeAlarms: Alarm[];
   recentAlarms: Alarm[];
   history: LiveHistoryPoint[];
@@ -81,6 +83,7 @@ const initialState: LiveState = {
   navigation: null,
   scenario: null,
   replay: null,
+  fleet: null,
   activeAlarms: [],
   recentAlarms: [],
   history: [],
@@ -205,6 +208,9 @@ const liveSlice = createSlice({
       state.scenario = action.payload;
     },
 
+    fleetReceived(state, action: PayloadAction<FleetSnapshot>) {
+      state.fleet = action.payload;
+    },
     replayStateReceived(state, action: PayloadAction<ReplayStatus>) {
       state.replay = action.payload;
     },
@@ -233,6 +239,7 @@ export const {
   allAlarmsAcknowledgedLocally,
   scenarioStateReceived,
   replayStateReceived,
+  fleetReceived,
   liveReset,
   mutedToggled
 } = liveSlice.actions;

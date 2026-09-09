@@ -166,6 +166,34 @@ function IntegrityPanel({ navigation }: { navigation: NavigationOutput }) {
           value={`${number(integrity.protection_level_growth_rate_m_per_s, 3)} m/s`}
           tone={integrity.protection_level_growth_rate_m_per_s > 0.05 ? 'caution' : undefined}
         />
+        {/* Time is the other thing GNSS provides, and the other thing an
+            attacker can falsify. Once GNSS is rejected, UTC is in holdover. */}
+        {navigation.time_integrity && (
+          <>
+            <KeyValue
+              label="UTC source"
+              value={navigation.time_integrity.utc_source}
+              title={navigation.time_integrity.reasons.join(' ') || 'Disciplined by a trusted GNSS clock.'}
+              tone={
+                navigation.time_integrity.utc_source === 'GNSS'
+                  ? undefined
+                  : navigation.time_integrity.utc_trusted
+                    ? 'caution'
+                    : 'critical'
+              }
+            />
+            <KeyValue
+              label="UTC error bound"
+              value={
+                navigation.time_integrity.utc_error_bound_s === null
+                  ? 'Unknown'
+                  : `${number(navigation.time_integrity.utc_error_bound_s, 3)} s`
+              }
+              title={`Required accuracy ${navigation.time_integrity.required_accuracy_s} s.`}
+              tone={navigation.time_integrity.utc_trusted ? undefined : 'critical'}
+            />
+          </>
+        )}
       </div>
 
       {integrity.requirement_reasons.length > 0 && (

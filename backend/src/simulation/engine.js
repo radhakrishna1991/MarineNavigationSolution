@@ -31,10 +31,30 @@ export class ScenarioEngine {
    * @param {object} options.scenario scenario definition
    * @param {number} [options.epochMs] wall-clock time mapped to simulation t=0
    */
-  constructor({ scenario, epochMs = Date.UTC(2024, 10, 18, 6, 0, 0) }) {
+  /**
+   * @param {object} options
+   * @param {object} options.scenario
+   * @param {number} [options.epochMs]
+   * @param {{east_m?: number, north_m?: number}} [options.stationOffset]
+   *   Translates this vessel's route within the operating area. A fleet whose
+   *   vessels all follow the identical track is not a fleet - they stack on
+   *   one another and the display shows one dot. The offset moves where the
+   *   vessel actually works; the seabed, the shoreline and every sensor still
+   *   see the real environment at that position, so the simulation stays
+   *   self-consistent.
+   */
+  constructor({ scenario, epochMs = Date.UTC(2024, 10, 18, 6, 0, 0), stationOffset = null } = {}) {
     this.scenario = scenario;
     this.epochMs = epochMs;
     this.environment = buildEnvironment();
+    if (stationOffset && (stationOffset.east_m || stationOffset.north_m)) {
+      const east = Number(stationOffset.east_m) || 0;
+      const north = Number(stationOffset.north_m) || 0;
+      this.environment = {
+        ...this.environment,
+        routeWaypoints: this.environment.routeWaypoints.map((w) => ({ ...w, e: w.e + east, n: w.n + north }))
+      };
+    }
     this.build();
   }
 

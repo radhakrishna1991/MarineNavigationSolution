@@ -99,6 +99,10 @@ placeholders only.
 | `VITE_API_BASE_URL` `VITE_WS_URL` | Optional. Only to point the dashboard at a backend on another origin — and Vite reads them from `frontend/.env`, not the root `.env`. Unset by default, so the dashboard uses relative URLs proxied by Vite in development and nginx in the container |
 | `ALLOW_ANONYMOUS_VIEWER` | Read-only demo access without sign-in. Off by default |
 
+The monitored fleet is defined in `backend/src/config/fleet.yaml` — one entry per
+vessel giving its identity, the scenario it is experiencing, and where in the
+operating area it works.
+
 **Navigation behaviour** — thresholds, noise models, sensor definitions, modes
 and scenarios — lives in YAML under `backend/src/config/`, not in the
 environment, because it is engineering configuration that belongs under review
@@ -110,6 +114,7 @@ and version control:
 | `sensors.yaml` | 13 sensors with simulation and fusion parameters |
 | `modes.yaml` | The 14 navigation modes, their entry predicates and operator guidance |
 | `scenarios.yaml` | 15 scenarios including the guided Safeen demonstration |
+| `fleet.yaml` | The monitored fleet: vessel identities, scenarios and station offsets |
 
 Runtime changes go through `PUT /api/config` (engineer or administrator), which
 enforces bounds on safety-critical paths, refuses unknown paths and type
@@ -175,7 +180,18 @@ implemented — see [docs/limitations.md](docs/limitations.md) §3.
 
 ## Screens
 
-**Navigation** — the main operational display: status banner, chart, position
+**Fleet** — the operations-room view. Every monitored vessel on one chart and
+one table, ordered by the attention each needs rather than alphabetically, with
+fleet-wide counts across the top. Each vessel runs its own complete pipeline:
+nothing is shared, so an attack on one says nothing about the others. Selecting
+a vessel opens its detail alongside.
+
+**Vessels** — the fleet register. Create, edit and remove vessels, and configure
+the sensor fit each one carries, with per-field validation. Backed by the
+`vessels` table; `fleet.yaml` seeds it on a fresh install and is then only a
+fallback, so an operator's edits survive a redeploy.
+
+**Navigation** — the single-vessel display: status banner, chart, position
 and uncertainty panels, mode and guidance.
 
 The chart draws the surveyed seabed as a shaded relief raster with depth
@@ -228,9 +244,9 @@ Seeding creates one account per role — `admin`, `engineer`, `operator`,
 ## Testing
 
 ```bash
-npm test              # 248 tests
-npm run test:backend  # 185 (Jest)
-npm run test:frontend # 63 (Vitest + React Testing Library)
+npm test              # 276 tests
+npm run test:backend  # 209 (Jest)
+npm run test:frontend # 67 (Vitest + React Testing Library)
 ```
 
 The API suite needs PostgreSQL; without it, it skips itself loudly and names the
@@ -255,6 +271,7 @@ instead of the lying one — are documented with their fixes in
 | [docs/safety.md](docs/safety.md) | Fail-safe behaviour, alarm philosophy, known undetectable conditions |
 | [docs/security.md](docs/security.md) | Implemented controls, deliberate placeholders, production requirements |
 | [docs/test-plan.md](docs/test-plan.md) | The suite, the measured results, the defects it found |
+| [docs/how-it-works.md](docs/how-it-works.md) | How the position is actually worked out, and what happens when GNSS or radar fails — plain language, for a non-specialist audience |
 | [docs/scenarios.md](docs/scenarios.md) | What each of the fifteen scenarios does, in plain language — written to be handed to an operator or a customer |
 | [docs/demo-script.md](docs/demo-script.md) | Running the Safeen demonstration |
 | [docs/roadmap.md](docs/roadmap.md) | Phases 1–6, with exit criteria and how it could fail |
@@ -277,10 +294,10 @@ backend/
     api/           routes, middleware, app
     ws/            live hub
     db/            migrations, seeds, pool
-  tests/           185 Jest tests
+  tests/           209 Jest tests
 frontend/
   src/             pages, components, map, charts, store, api, ws, hooks
-  tests/           63 Vitest + RTL tests
+  tests/           67 Vitest + RTL tests
 scripts/           generate_demo_data, run_scenario, export_results, seed_database
 docs/              the ten documents above
 ```

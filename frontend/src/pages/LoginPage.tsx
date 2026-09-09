@@ -1,7 +1,7 @@
 /**
  * Sign-in screen.
  *
- * Carries the platform's classification prominently: anyone who reaches this
+ * Carries the platform's identity: anyone who reaches this
  * screen should understand what the system is before they log into it.
  */
 
@@ -90,14 +90,13 @@ export function LoginPage() {
               </ul>
             </div>
 
-            <div className="mt-8 rounded-lg border border-caution/40 bg-caution/10 p-3">
-              <p className="text-2xs font-bold uppercase tracking-[0.14em] text-caution">
-                Proof of concept · decision support only
+            <div className="mt-8 rounded-lg border border-bridge-700 bg-bridge-850/60 p-3">
+              <p className="text-2xs font-bold uppercase tracking-[0.14em] text-bridge-300">
+                Monitoring and decision support
               </p>
-              <p className="mt-1.5 text-xs leading-relaxed text-bridge-300">
-                This is a demonstration system, not a certified navigation product. Geospatial data is synthetic and is
-                not an official chart. The platform has no control interface to autopilot, dynamic positioning,
-                propulsion or steering gear.
+              <p className="mt-1.5 text-xs leading-relaxed text-bridge-400">
+                The platform observes and assesses. It has no control interface to autopilot, dynamic positioning,
+                propulsion or steering gear, and cannot be given one.
               </p>
             </div>
           </div>
@@ -180,7 +179,7 @@ export function LoginPage() {
         <div className="mt-4 flex flex-col items-center gap-3">
           <ThemeToggle />
           <p className="text-center text-2xs text-bridge-600">
-            Demonstration geospatial data — not for navigation.
+            Assured positioning when GNSS cannot be trusted.
           </p>
         </div>
       </div>

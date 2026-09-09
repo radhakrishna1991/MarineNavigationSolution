@@ -161,6 +161,19 @@ dead_reckoning:
   speed_scale_error: 0.004
   bottom_lock_loss_velocity_sigma_mps: 0.35
 
+# --- Time integrity ---------------------------------------------------------
+# Satellite navigation solves for time and position together, so a spoofed
+# receiver usually reports a false clock as well. Once GNSS is no longer
+# trusted, UTC is in holdover on the local oscillator and its error grows.
+time_integrity:
+  # What the platform must hold UTC to for its timestamps to be relied upon.
+  required_utc_accuracy_s: 1.0
+  # Residual bound while disciplined by a trusted GNSS clock.
+  gnss_utc_bound_s: 0.001
+  # Free-running oscillator drift. 1e-7 is about 0.1 ppm - a decent TCXO, which
+  # accumulates roughly 8.6 ms per day.
+  holdover_drift_s_per_s: 0.0000001
+
 # --- Sensor fusion (Section 11) --------------------------------------------
 fusion:
   filter: EKF
